@@ -8,6 +8,7 @@ router.get('/ping', (req, res) => {
 });
 
 // Auth Controller (Public routes)
+// use this routes for everything related to authentication
 router.post('/login', authController.login);
 router.get('/logout', authenticate, authController.logout);
 
