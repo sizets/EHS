@@ -22,7 +22,47 @@ try {
 }
 
 const authController = {
+    register: async (req, res) => {
+        const { name, email, password, role } = req.body;
 
+        if (!name || !email || !password) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        // Validate role if provided - Admin registration not allowed
+        const validRoles = ['patient', 'doctor'];
+        if (role && role.toLowerCase() === 'admin') {
+            return res.status(403).json({ error: 'Admin registration is not allowed. Admin accounts must be created by system administrators.' });
+        }
+        const userRole = role && validRoles.includes(role.toLowerCase()) ? role.toLowerCase() : 'patient';
+
+
+
+        try {
+            const dbInstance = await connectDB();
+            const existingUser = await dbInstance.collection('users').findOne({ email: email.trim().toLowerCase() });
+
+            if (existingUser) {
+                return res.status(409).json({ error: 'User with this email already exists' });
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const newUser = {
+                name: name.trim(),
+                email: email.trim().toLowerCase(),
+                password: hashedPassword,
+                role: userRole,
+                createdAt: new Date(),
+            };
+
+            await dbInstance.collection('users').insertOne(newUser);
+            return res.status(201).json({ message: 'User registered successfully' });
+
+        } catch (error) {
+            console.error('Register Error:', error);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+    },
 
     login: async (req, res) => {
         const { email, password } = req.body;
@@ -65,6 +105,73 @@ const authController = {
 
     logout: (req, res) => {
         return res.status(200).json({ message: 'Logged out successfully' });
+    },
+
+    getProfile: async (req, res) => {
+        try {
+            const dbInstance = await connectDB();
+            const user = await dbInstance.collection('users').findOne({ _id: new ObjectId(req.user.id) });
+
+            if (!user) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            return res.status(200).json({
+                user: {
+                    id: user._id.toString(),
+                    name: user.name,
+                    email: user.email,
+                    role: user.role || 'patient',
+                    createdAt: user.createdAt
+                }
+            });
+        } catch (error) {
+            console.error('Profile Error:', error);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    contact: async (req, res) => {
+        const { name, email, message, subject } = req.body;
+
+        if (!name || !email || !message || !subject) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        try {
+            const dbInstance = await connectDB();
+            await dbInstance.collection('contact').insertOne({
+                name,
+                email,
+                message,
+                subject,
+                createdAt: new Date()
+            });
+            return res.status(200).json({ message: 'Contact form submitted' });
+        } catch (error) {
+            console.error('Contact Error:', error);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    subscribe: async (req, res) => {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        try {
+            const dbInstance = await connectDB();
+            await dbInstance.collection('subscribers').insertOne({
+                email,
+                createdAt: new Date()
+            });
+            return res.status(200).json({ message: 'Subscribed successfully' });
+        } catch (error) {
+            console.error('Subscribe Error:', error);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
     },
 
     forgotPassword: async (req, res) => {
@@ -182,7 +289,43 @@ const authController = {
         }
     },
 
+    // Test Courier email functionality
+    testEmail: async (req, res) => {
+        const { email } = req.body;
 
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        if (!courier || !process.env.COURIER_AUTH_TOKEN) {
+            return res.status(500).json({ error: 'Courier email service not configured' });
+        }
+
+        try {
+            const { requestId } = await courier.send({
+                message: {
+                    to: {
+                        email: email,
+                    },
+                    template: process.env.COURIER_TEMPLATE_ID || "test-email",
+                    data: {
+                        userName: 'Test User',
+                        hospitalName: 'HospitalMS',
+                        message: 'This is a test email from HospitalMS'
+                    },
+                },
+            });
+
+            return res.status(200).json({
+                message: 'Test email sent successfully',
+                requestId: requestId
+            });
+
+        } catch (error) {
+            console.error('Test Email Error:', error);
+            return res.status(500).json({ error: 'Failed to send test email' });
+        }
+    }
 };
 
 module.exports = authController;

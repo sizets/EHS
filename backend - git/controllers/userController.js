@@ -8,7 +8,7 @@ const userController = {
         try {
             const dbInstance = await connectDB();
             const users = await dbInstance.collection('users').find({}).toArray();
-            
+
             // Remove passwords from response
             const safeUsers = users.map(user => {
                 const { password, resetToken, resetTokenExpiry, ...safeUser } = user;
@@ -27,9 +27,9 @@ const userController = {
         try {
             const { id } = req.params;
             const dbInstance = await connectDB();
-            
+
             const user = await dbInstance.collection('users').findOne({ _id: new ObjectId(id) });
-            
+
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
             }
@@ -60,12 +60,12 @@ const userController = {
             }
 
             const dbInstance = await connectDB();
-            
+
             // Check if user already exists
-            const existingUser = await dbInstance.collection('users').findOne({ 
-                email: email.trim().toLowerCase() 
+            const existingUser = await dbInstance.collection('users').findOne({
+                email: email.trim().toLowerCase()
             });
-            
+
             if (existingUser) {
                 return res.status(409).json({ error: 'User with this email already exists' });
             }
@@ -85,7 +85,7 @@ const userController = {
             };
 
             const result = await dbInstance.collection('users').insertOne(user);
-            
+
             // Remove password from response
             delete user.password;
             user.id = result.insertedId;
@@ -108,7 +108,7 @@ const userController = {
             const { name, email, role, password } = req.body;
 
             const dbInstance = await connectDB();
-            
+
             // Check if user exists
             const existingUser = await dbInstance.collection('users').findOne({ _id: new ObjectId(id) });
             if (!existingUser) {
@@ -136,7 +136,7 @@ const userController = {
 
             // Check for email conflicts (if email is being updated)
             if (email && email !== existingUser.email) {
-                const emailExists = await dbInstance.collection('users').findOne({ 
+                const emailExists = await dbInstance.collection('users').findOne({
                     email: email.trim().toLowerCase(),
                     _id: { $ne: new ObjectId(id) }
                 });
@@ -198,14 +198,14 @@ const userController = {
         try {
             const { role } = req.params;
             const dbInstance = await connectDB();
-            
+
             const validRoles = ['patient', 'doctor', 'admin'];
             if (!validRoles.includes(role.toLowerCase())) {
                 return res.status(400).json({ error: 'Invalid role' });
             }
 
-            const users = await dbInstance.collection('users').find({ 
-                role: role.toLowerCase() 
+            const users = await dbInstance.collection('users').find({
+                role: role.toLowerCase()
             }).toArray();
 
             // Remove passwords from response

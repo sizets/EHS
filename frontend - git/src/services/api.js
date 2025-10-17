@@ -39,9 +39,30 @@ export const hmsApi = {
     register: (body) => request('/register', { method: 'POST', body: JSON.stringify(body) }),
     login: (body) => request('/login', { method: 'POST', body: JSON.stringify(body) }),
     logout: () => request('/logout', { method: 'GET' }),
-
+    getProfile: () => request('/profile'),
     forgotPassword: (body) => request('/forgot-password', { method: 'POST', body: JSON.stringify(body) }),
     resetPassword: (body) => request('/reset-password', { method: 'POST', body: JSON.stringify(body) }),
+
+    // Dashboard
+    getSummary: () => request('/dashboard/summary'),
+
+    // Patients
+    listPatients: (query = '') => request(`/patients${query ? `?${query}` : ''}`),
+    createPatient: (body) => request('/patients', { method: 'POST', body: JSON.stringify(body) }),
+    updatePatient: (id, body) => request(`/patients/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    deletePatient: (id) => request(`/patients/${id}`, { method: 'DELETE' }),
+
+    // Doctors
+    listDoctors: (query = '') => request(`/doctors${query ? `?${query}` : ''}`),
+    createDoctor: (body) => request('/doctors', { method: 'POST', body: JSON.stringify(body) }),
+    updateDoctor: (id, body) => request(`/doctors/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteDoctor: (id) => request(`/doctors/${id}`, { method: 'DELETE' }),
+
+    // Appointments
+    listAppointments: () => request('/appointments'),
+    createAppointment: (body) => request('/appointments', { method: 'POST', body: JSON.stringify(body) }),
+    updateAppointmentStatus: (id, status) => request(`/appointments/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+    deleteAppointment: (id) => request(`/appointments/${id}`, { method: 'DELETE' }),
 
     // User Management (Admin only)
     getAllUsers: () => request('/users'),
@@ -50,5 +71,4 @@ export const hmsApi = {
     createUser: (body) => request('/users', { method: 'POST', body: JSON.stringify(body) }),
     updateUser: (id, body) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
-
 };
