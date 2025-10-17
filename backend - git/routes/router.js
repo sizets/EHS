@@ -12,5 +12,12 @@ router.get('/ping', (req, res) => {
 router.post('/login', authController.login);
 router.get('/logout', authenticate, authController.logout);
 
+// User Management Routes (Admin only)
+router.get('/users', authenticate, requireAdmin, userController.getAllUsers);
+router.get('/users/role/:role', authenticate, requireAdmin, userController.getUsersByRole);
+router.get('/users/:id', authenticate, requireAdmin, userController.getUserById);
+router.post('/users', authenticate, requireAdmin, userController.createUser);
+router.put('/users/:id', authenticate, requireAdmin, userController.updateUser);
+router.delete('/users/:id', authenticate, requireAdmin, userController.deleteUser);
 
 module.exports = router; 
