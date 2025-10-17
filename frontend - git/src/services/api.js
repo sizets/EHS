@@ -41,4 +41,12 @@ export const hmsApi = {
     logout: () => request('/logout', { method: 'GET' }),
 
 
+    // User Management (Admin only)
+    getAllUsers: () => request('/users'),
+    getUsersByRole: (role) => request(`/users/role/${role}`),
+    getUserById: (id) => request(`/users/${id}`),
+    createUser: (body) => request('/users', { method: 'POST', body: JSON.stringify(body) }),
+    updateUser: (id, body) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
+
 };
