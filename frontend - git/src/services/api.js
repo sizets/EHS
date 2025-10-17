@@ -40,6 +40,8 @@ export const hmsApi = {
     login: (body) => request('/login', { method: 'POST', body: JSON.stringify(body) }),
     logout: () => request('/logout', { method: 'GET' }),
 
+    forgotPassword: (body) => request('/forgot-password', { method: 'POST', body: JSON.stringify(body) }),
+    resetPassword: (body) => request('/reset-password', { method: 'POST', body: JSON.stringify(body) }),
 
     // User Management (Admin only)
     getAllUsers: () => request('/users'),
