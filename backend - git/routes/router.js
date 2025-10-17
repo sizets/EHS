@@ -1,14 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const googleAuthController = require('../controllers/googleAuthController');
+const authController = require('../controllers/authController');
+const authenticate = require('../middleware/authenticate');
 
-// Google OAuth routes
-router.get('/auth/google', googleAuthController.googleAuth);
-router.get('/auth/google/callback', googleAuthController.googleCallback);
-
-// Basic ping endpoint
 router.get('/ping', (req, res) => {
     res.status(200).json({ message: 'PING endpoint' });
 });
 
-module.exports = router;
+// Auth Controller (Public routes)
+router.post('/login', authController.login);
+router.get('/logout', authenticate, authController.logout);
+
+
+module.exports = router; 
