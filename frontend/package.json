@@ -1,5 +1,5 @@
 {
-  "name": "mern-ecommerce",
+  "name": "hospitalms-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,9 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google-cloud/local-auth": "^3.0.1",
     "axios": "^1.7.7",
-    "google-auth-library": "^10.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.1",
