@@ -22,48 +22,6 @@ try {
 }
 
 const authController = {
-    register: async (req, res) => {
-        const { name, email, password, role } = req.body;
-
-        if (!name || !email || !password) {
-            return res.status(400).json({ error: 'All fields are required' });
-        }
-
-        // Validate role if provided - Admin registration not allowed
-        const validRoles = ['patient', 'doctor'];
-        if (role && role.toLowerCase() === 'admin') {
-            return res.status(403).json({ error: 'Admin registration is not allowed. Admin accounts must be created by system administrators.' });
-        }
-        const userRole = role && validRoles.includes(role.toLowerCase()) ? role.toLowerCase() : 'patient';
-
-
-
-        try {
-            const dbInstance = await connectDB();
-            const existingUser = await dbInstance.collection('users').findOne({ email: email.trim().toLowerCase() });
-
-            if (existingUser) {
-                return res.status(409).json({ error: 'User with this email already exists' });
-            }
-
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const newUser = {
-                name: name.trim(),
-                email: email.trim().toLowerCase(),
-                password: hashedPassword,
-                role: userRole,
-                createdAt: new Date(),
-            };
-
-            await dbInstance.collection('users').insertOne(newUser);
-            return res.status(201).json({ message: 'User registered successfully' });
-
-        } catch (error) {
-            console.error('Register Error:', error);
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-    },
-
     login: async (req, res) => {
         const { email, password } = req.body;
 
@@ -288,6 +246,53 @@ const authController = {
             return res.status(500).json({ error: 'Internal server error' });
         }
     },
+
+    // Send account creation email
+    // Email template variables available:
+    // - {userName}: User's full name
+    // - {email}: User's email address  
+    // - {pass}: User's password (plain text)
+    // - {activationUrl}: URL to login page
+    // - {role}: User's role (Patient, Doctor, Admin)
+    // - {hospitalName}: Hospital name (HospitalMS)
+    sendAccountCreationEmail: async (userData) => {
+        const { name, email, password, role } = userData;
+
+        if (!courier || !process.env.COURIER_AUTH_TOKEN) {
+            console.warn('⚠️ Courier not configured. Skipping account creation email.');
+            return { success: false, error: 'Email service not configured' };
+        }
+
+        try {
+            // Generate activation URL (you can customize this based on your needs)
+            const activationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`;
+
+            const { requestId } = await courier.send({
+                message: {
+                    to: {
+                        email: email,
+                    },
+                    template: process.env.COURIER_ACCOUNT_CREATION_TEMPLATE_ID || "account-creation",
+                    data: {
+                        userName: name,
+                        email: email,
+                        pass: password,
+                        activationUrl: activationUrl,
+                        role: role.charAt(0).toUpperCase() + role.slice(1),
+                        hospitalName: 'HospitalMS'
+                    },
+                },
+            });
+
+            console.log('✅ Account creation email sent via Courier:', requestId);
+            return { success: true, requestId };
+
+        } catch (error) {
+            console.error('❌ Account creation email send failed:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
 
     // Test Courier email functionality
     testEmail: async (req, res) => {

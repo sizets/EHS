@@ -36,7 +36,6 @@ async function request(path, options = {}) {
 
 export const hmsApi = {
     // Auth
-    register: (body) => request('/register', { method: 'POST', body: JSON.stringify(body) }),
     login: (body) => request('/login', { method: 'POST', body: JSON.stringify(body) }),
     logout: () => request('/logout', { method: 'GET' }),
     getProfile: () => request('/profile'),
@@ -71,4 +70,11 @@ export const hmsApi = {
     createUser: (body) => request('/users', { method: 'POST', body: JSON.stringify(body) }),
     updateUser: (id, body) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
+
+    // Department Management (Admin only)
+    getAllDepartments: () => request('/departments'),
+    getDepartmentById: (id) => request(`/departments/${id}`),
+    createDepartment: (body) => request('/departments', { method: 'POST', body: JSON.stringify(body) }),
+    updateDepartment: (id, body) => request(`/departments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteDepartment: (id) => request(`/departments/${id}`, { method: 'DELETE' }),
 };

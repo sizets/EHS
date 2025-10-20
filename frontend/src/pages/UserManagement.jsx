@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import { hmsApi } from "../services/api";
 import CreateUserModal from "../components/CreateUserModal";
 import EditUserModal from "../components/EditUserModal";
+import ConfirmModal from "../components/ConfirmModal";
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -10,6 +11,8 @@ const UserManagement = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [filterRole, setFilterRole] = useState("all");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -28,21 +31,34 @@ const UserManagement = () => {
     }
   };
 
-  const handleDeleteUser = async (userId, userName) => {
-    if (window.confirm(`Are you sure you want to delete ${userName}?`)) {
-      try {
-        await hmsApi.deleteUser(userId);
-        toast.success("User deleted successfully");
-        fetchUsers();
-      } catch (error) {
-        console.error("Error deleting user:", error);
-        toast.error(error.message || "Failed to delete user");
-      }
+  const handleDeleteUser = (userId, userName) => {
+    setUserToDelete({ id: userId, name: userName });
+    setShowConfirmModal(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    try {
+      await hmsApi.deleteUser(userToDelete.id);
+      toast.success("User deleted successfully");
+      fetchUsers();
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast.error(error.message || "Failed to delete user");
+    } finally {
+      setShowConfirmModal(false);
+      setUserToDelete(null);
     }
   };
 
-  const filteredUsers = users.filter(user => 
-    filterRole === "all" || user.role === filterRole
+  const cancelDeleteUser = () => {
+    setShowConfirmModal(false);
+    setUserToDelete(null);
+  };
+
+  const filteredUsers = users.filter(
+    (user) => filterRole === "all" || user.role === filterRole
   );
 
   if (loading) {
@@ -176,12 +192,13 @@ const UserManagement = () => {
                 d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
               />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No users found</h3>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">
+              No users found
+            </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {filterRole === "all" 
+              {filterRole === "all"
                 ? "Get started by creating a new user."
-                : `No users found with role: ${filterRole}`
-              }
+                : `No users found with role: ${filterRole}`}
             </p>
           </div>
         </div>
@@ -194,6 +211,7 @@ const UserManagement = () => {
           onSuccess={() => {
             setShowCreateForm(false);
             fetchUsers();
+            toast.success("User created successfully!");
           }}
         />
       )}
@@ -206,7 +224,22 @@ const UserManagement = () => {
           onSuccess={() => {
             setEditingUser(null);
             fetchUsers();
+            toast.success("User updated successfully!");
           }}
+        />
+      )}
+
+      {/* Confirm Delete Modal */}
+      {showConfirmModal && (
+        <ConfirmModal
+          isOpen={showConfirmModal}
+          onClose={cancelDeleteUser}
+          onConfirm={confirmDeleteUser}
+          title="Delete User"
+          message={`Are you sure you want to delete "${userToDelete?.name}"? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          type="danger"
         />
       )}
     </div>

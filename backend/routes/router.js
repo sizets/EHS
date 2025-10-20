@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
+const departmentController = require('../controllers/departmentController');
 const authenticate = require('../middleware/authenticate');
 const requireAdmin = require('../middleware/requireAdmin');
 
@@ -10,7 +11,6 @@ router.get('/ping', (req, res) => {
 });
 
 // Auth Controller (Public routes)
-router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
@@ -27,5 +27,12 @@ router.get('/users/:id', authenticate, requireAdmin, userController.getUserById)
 router.post('/users', authenticate, requireAdmin, userController.createUser);
 router.put('/users/:id', authenticate, requireAdmin, userController.updateUser);
 router.delete('/users/:id', authenticate, requireAdmin, userController.deleteUser);
+
+// Department Management Routes (Admin only)
+router.get('/departments', authenticate, requireAdmin, departmentController.getAllDepartments);
+router.get('/departments/:id', authenticate, requireAdmin, departmentController.getDepartmentById);
+router.post('/departments', authenticate, requireAdmin, departmentController.createDepartment);
+router.put('/departments/:id', authenticate, requireAdmin, departmentController.updateDepartment);
+router.delete('/departments/:id', authenticate, requireAdmin, departmentController.deleteDepartment);
 
 module.exports = router; 

@@ -4,12 +4,9 @@ import { toast } from "react-toastify";
 import { hmsApi } from "../services/api";
 
 const Login = () => {
-  const [isLogin, setIsLogin] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
     email: "",
     password: "",
-    role: "patient",
   });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -30,32 +27,18 @@ const Login = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
-        const res = await hmsApi.login({
-          email: formData.email,
-          password: formData.password,
-        });
-        if (res?.token) {
-          localStorage.setItem("token", res.token);
-          if (res.user?.role)
-            localStorage.setItem("role", res.user.role.toLowerCase());
-          toast.success("Login successful!");
-          navigate(from, { replace: true });
-        } else {
-          throw new Error("Invalid login response");
-        }
+      const res = await hmsApi.login({
+        email: formData.email,
+        password: formData.password,
+      });
+      if (res?.token) {
+        localStorage.setItem("token", res.token);
+        if (res.user?.role)
+          localStorage.setItem("role", res.user.role.toLowerCase());
+        toast.success("Login successful!");
+        navigate(from, { replace: true });
       } else {
-        const res = await hmsApi.register({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          role: formData.role,
-        });
-        if (res?.message) {
-          toast.success("Registered successfully! Please login.");
-          setIsLogin(true);
-          setFormData({ name: "", email: "", password: "", role: "patient" });
-        }
+        throw new Error("Invalid login response");
       }
     } catch (error) {
       console.error("Auth error:", error);
@@ -81,49 +64,12 @@ const Login = () => {
         >
           {/* Header */}
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              {isLogin ? "Sign In" : "Create Account"}
-            </h2>
-            <p className="text-gray-600">
-              {isLogin ? "Welcome back to HospitalMS" : "Join HospitalMS today"}
-            </p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Sign In</h2>
+            <p className="text-gray-600">Welcome back to HospitalMS</p>
           </div>
 
           {/* Inputs */}
           <div className="space-y-4">
-            {!isLogin && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="John Doe"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Role
-                  </label>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="patient">Patient</option>
-                    <option value="doctor">Doctor</option>
-                  </select>
-                </div>
-              </>
-            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Email Address
@@ -156,21 +102,12 @@ const Login = () => {
 
           {/* Extra links */}
           <div className="flex justify-between items-center text-sm">
-            {isLogin && (
-              <Link
-                to="/forgot-password"
-                className="text-blue-600 hover:text-blue-500"
-              >
-                Forgot your password?
-              </Link>
-            )}
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
+            <Link
+              to="/forgot-password"
               className="text-blue-600 hover:text-blue-500"
             >
-              {isLogin ? "Create a new account" : "Already have an account?"}
-            </button>
+              Forgot your password?
+            </Link>
           </div>
 
           {/* Submit button */}
@@ -179,7 +116,7 @@ const Login = () => {
             disabled={loading}
             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Processing..." : isLogin ? "Sign In" : "Create Account"}
+            {loading ? "Processing..." : "Sign In"}
           </button>
         </form>
       </div>

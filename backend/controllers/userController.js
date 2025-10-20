@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { ObjectId } = require('mongodb');
 const connectDB = require('../mongo');
+const authController = require('./authController');
 
 const userController = {
     // Get all users (Admin only)
@@ -8,7 +9,7 @@ const userController = {
         try {
             const dbInstance = await connectDB();
             const users = await dbInstance.collection('users').find({}).toArray();
-            
+
             // Remove passwords from response
             const safeUsers = users.map(user => {
                 const { password, resetToken, resetTokenExpiry, ...safeUser } = user;
@@ -26,10 +27,16 @@ const userController = {
     getUserById: async (req, res) => {
         try {
             const { id } = req.params;
+
+            // Validate ObjectId format
+            if (!ObjectId.isValid(id)) {
+                return res.status(400).json({ error: 'Invalid user ID format' });
+            }
+
             const dbInstance = await connectDB();
-            
+
             const user = await dbInstance.collection('users').findOne({ _id: new ObjectId(id) });
-            
+
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
             }
@@ -46,11 +53,11 @@ const userController = {
     // Create new user (Admin only)
     createUser: async (req, res) => {
         try {
-            const { name, email, password, role } = req.body;
+            const { name, email, password, role, phone, dateOfBirth, address, specialization, licenseNumber, department, emergencyContact, medicalHistory, allergies } = req.body;
 
             // Validation
             if (!name || !email || !password || !role) {
-                return res.status(400).json({ error: 'All fields are required' });
+                return res.status(400).json({ error: 'Name, email, password, and role are required' });
             }
 
             // Validate role
@@ -60,12 +67,12 @@ const userController = {
             }
 
             const dbInstance = await connectDB();
-            
+
             // Check if user already exists
-            const existingUser = await dbInstance.collection('users').findOne({ 
-                email: email.trim().toLowerCase() 
+            const existingUser = await dbInstance.collection('users').findOne({
+                email: email.trim().toLowerCase()
             });
-            
+
             if (existingUser) {
                 return res.status(409).json({ error: 'User with this email already exists' });
             }
@@ -74,25 +81,74 @@ const userController = {
             const saltRounds = 10;
             const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-            // Create user
+            // Create base user object
             const user = {
                 name: name.trim(),
                 email: email.trim().toLowerCase(),
                 password: hashedPassword,
                 role: role.toLowerCase(),
+                phone: phone?.trim() || '',
+                address: address?.trim() || '',
                 createdAt: new Date(),
                 updatedAt: new Date()
             };
 
+            // Add role-specific fields
+            if (role.toLowerCase() === 'doctor') {
+                user.specialization = specialization?.trim() || '';
+                user.licenseNumber = licenseNumber?.trim() || '';
+                user.department = department?.trim() || '';
+            } else if (role.toLowerCase() === 'patient') {
+                user.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+                user.emergencyContact = emergencyContact?.trim() || '';
+                user.medicalHistory = medicalHistory?.trim() || '';
+                user.allergies = allergies?.trim() || '';
+            }
+
             const result = await dbInstance.collection('users').insertOne(user);
-            
+
+            // Send account creation email
+            try {
+                const emailResult = await authController.sendAccountCreationEmail({
+                    name: name.trim(),
+                    email: email.trim().toLowerCase(),
+                    password: password, // Send the plain password for the email
+                    role: role.toLowerCase()
+                });
+
+                if (emailResult.success) {
+                    console.log('✅ Account creation email sent successfully');
+                } else {
+                    console.warn('⚠️ Failed to send account creation email:', emailResult.error);
+                }
+            } catch (emailError) {
+                console.error('❌ Error sending account creation email:', emailError);
+                // Don't fail the user creation if email fails
+            }
+
             // Remove password from response
             delete user.password;
             user.id = result.insertedId;
 
             res.status(201).json({
                 message: 'User created successfully',
-                user
+                user: {
+                    id: result.insertedId,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    phone: user.phone,
+                    address: user.address,
+                    specialization: user.specialization || '',
+                    licenseNumber: user.licenseNumber || '',
+                    department: user.department || '',
+                    dateOfBirth: user.dateOfBirth || null,
+                    emergencyContact: user.emergencyContact || '',
+                    medicalHistory: user.medicalHistory || '',
+                    allergies: user.allergies || '',
+                    createdAt: user.createdAt,
+                    updatedAt: user.updatedAt
+                }
             });
 
         } catch (error) {
@@ -105,10 +161,15 @@ const userController = {
     updateUser: async (req, res) => {
         try {
             const { id } = req.params;
-            const { name, email, role, password } = req.body;
+            const { name, email, role, password, phone, dateOfBirth, address, specialization, licenseNumber, department, emergencyContact, medicalHistory, allergies } = req.body;
+
+            // Validate ObjectId format
+            if (!ObjectId.isValid(id)) {
+                return res.status(400).json({ error: 'Invalid user ID format' });
+            }
 
             const dbInstance = await connectDB();
-            
+
             // Check if user exists
             const existingUser = await dbInstance.collection('users').findOne({ _id: new ObjectId(id) });
             if (!existingUser) {
@@ -120,15 +181,63 @@ const userController = {
                 updatedAt: new Date()
             };
 
+            // Update basic fields
             if (name) updateData.name = name.trim();
             if (email) updateData.email = email.trim().toLowerCase();
+            if (phone !== undefined) updateData.phone = phone?.trim() || '';
+            if (address !== undefined) updateData.address = address?.trim() || '';
+
+            // Update role-specific fields
             if (role) {
                 const validRoles = ['patient', 'doctor', 'admin'];
                 if (!validRoles.includes(role.toLowerCase())) {
                     return res.status(400).json({ error: 'Invalid role' });
                 }
                 updateData.role = role.toLowerCase();
+
+                // Clear role-specific fields when role changes
+                if (role.toLowerCase() === 'doctor') {
+                    updateData.specialization = specialization?.trim() || '';
+                    updateData.licenseNumber = licenseNumber?.trim() || '';
+                    updateData.department = department?.trim() || '';
+                    // Clear patient fields
+                    updateData.dateOfBirth = null;
+                    updateData.emergencyContact = '';
+                    updateData.medicalHistory = '';
+                    updateData.allergies = '';
+                } else if (role.toLowerCase() === 'patient') {
+                    updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+                    updateData.emergencyContact = emergencyContact?.trim() || '';
+                    updateData.medicalHistory = medicalHistory?.trim() || '';
+                    updateData.allergies = allergies?.trim() || '';
+                    // Clear doctor fields
+                    updateData.specialization = '';
+                    updateData.licenseNumber = '';
+                    updateData.department = '';
+                } else if (role.toLowerCase() === 'admin') {
+                    // Clear all role-specific fields for admin
+                    updateData.specialization = '';
+                    updateData.licenseNumber = '';
+                    updateData.department = '';
+                    updateData.dateOfBirth = null;
+                    updateData.emergencyContact = '';
+                    updateData.medicalHistory = '';
+                    updateData.allergies = '';
+                }
+            } else {
+                // If role is not being updated, only update the specific fields for current role
+                if (existingUser.role === 'doctor') {
+                    if (specialization !== undefined) updateData.specialization = specialization?.trim() || '';
+                    if (licenseNumber !== undefined) updateData.licenseNumber = licenseNumber?.trim() || '';
+                    if (department !== undefined) updateData.department = department?.trim() || '';
+                } else if (existingUser.role === 'patient') {
+                    if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+                    if (emergencyContact !== undefined) updateData.emergencyContact = emergencyContact?.trim() || '';
+                    if (medicalHistory !== undefined) updateData.medicalHistory = medicalHistory?.trim() || '';
+                    if (allergies !== undefined) updateData.allergies = allergies?.trim() || '';
+                }
             }
+
             if (password) {
                 const saltRounds = 10;
                 updateData.password = await bcrypt.hash(password, saltRounds);
@@ -136,7 +245,7 @@ const userController = {
 
             // Check for email conflicts (if email is being updated)
             if (email && email !== existingUser.email) {
-                const emailExists = await dbInstance.collection('users').findOne({ 
+                const emailExists = await dbInstance.collection('users').findOne({
                     email: email.trim().toLowerCase(),
                     _id: { $ne: new ObjectId(id) }
                 });
@@ -166,6 +275,12 @@ const userController = {
     deleteUser: async (req, res) => {
         try {
             const { id } = req.params;
+
+            // Validate ObjectId format
+            if (!ObjectId.isValid(id)) {
+                return res.status(400).json({ error: 'Invalid user ID format' });
+            }
+
             const dbInstance = await connectDB();
 
             // Check if user exists
@@ -198,14 +313,14 @@ const userController = {
         try {
             const { role } = req.params;
             const dbInstance = await connectDB();
-            
+
             const validRoles = ['patient', 'doctor', 'admin'];
             if (!validRoles.includes(role.toLowerCase())) {
                 return res.status(400).json({ error: 'Invalid role' });
             }
 
-            const users = await dbInstance.collection('users').find({ 
-                role: role.toLowerCase() 
+            const users = await dbInstance.collection('users').find({
+                role: role.toLowerCase()
             }).toArray();
 
             // Remove passwords from response

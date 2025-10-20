@@ -68,6 +68,8 @@ const getPageTitle = (pathname) => {
       return "Dashboard";
     case "/users":
       return "User Management";
+    case "/departments":
+      return "Department Management";
     case "/patients":
       return "Patient Management";
     case "/doctors":
@@ -87,6 +89,8 @@ const getPageDescription = (pathname) => {
       return "Overview of hospital operations";
     case "/users":
       return "Manage system users and their roles";
+    case "/departments":
+      return "Manage hospital departments";
     case "/patients":
       return "Manage patient records and information";
     case "/doctors":
