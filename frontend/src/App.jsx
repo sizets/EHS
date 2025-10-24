@@ -12,6 +12,8 @@ import UserManagement from "./pages/UserManagement";
 import DepartmentManagement from "./pages/DepartmentManagement";
 import AssignmentManagement from "./pages/AssignmentManagement";
 import DoctorManagement from "./pages/DoctorManagement";
+import MyPatients from "./pages/MyPatients";
+import DoctorProfile from "./pages/DoctorProfile";
 
 const App = () => {
   return (
@@ -60,6 +62,22 @@ const App = () => {
           element={
             <ProtectedRoute requiredRole="admin">
               <DoctorManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-patients"
+          element={
+            <ProtectedRoute requiredRole="doctor">
+              <MyPatients />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute requiredRole="doctor">
+              <DoctorProfile />
             </ProtectedRoute>
           }
         />

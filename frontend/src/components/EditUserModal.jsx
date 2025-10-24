@@ -93,7 +93,7 @@ const EditUserModal = ({ user, onClose, onSuccess }) => {
         updateData.password = formData.password;
       }
 
-      await hmsApi.updateUser(user._id, updateData);
+      await hmsApi.updateUser(user.id, updateData);
       onSuccess();
     } catch (error) {
       toast.error(error.message || "Failed to update user");

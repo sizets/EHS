@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { ObjectId } = require('mongodb');
 const connectDB = require('../mongo');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'randomsecretkey12345'; // Use environment variable
@@ -102,14 +103,27 @@ const authController = {
                 return res.status(404).json({ error: 'User not found' });
             }
 
+            // Get department name if user has a department
+            let departmentName = null;
+            if (user.department) {
+                const department = await dbInstance.collection('departments').findOne({
+                    _id: user.department
+                });
+                departmentName = department ? department.name : null;
+            }
+
+            // Remove sensitive data and format response
+            const { password, resetToken, resetTokenExpiry, ...safeUser } = user;
+            safeUser.id = user._id.toString();
+            delete safeUser._id;
+
+            // Add department name to response
+            if (departmentName) {
+                safeUser.departmentName = departmentName;
+            }
+
             return res.status(200).json({
-                user: {
-                    id: user._id.toString(),
-                    name: user.name,
-                    email: user.email,
-                    role: user.role || 'patient',
-                    createdAt: user.createdAt
-                }
+                user: safeUser
             });
         } catch (error) {
             console.error('Profile Error:', error);
