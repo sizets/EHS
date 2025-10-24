@@ -25,7 +25,7 @@ router.put('/users/:id', authenticate, requireAdmin, userController.updateUser);
 router.delete('/users/:id', authenticate, requireAdmin, userController.deleteUser);
 
 // Department Management Routes (Admin only)
-router.get('/departments', authenticate, requireAdmin, departmentController.getAllDepartments);
+router.get('/departments', authenticate, departmentController.getAllDepartments);
 router.get('/departments/:id', authenticate, requireAdmin, departmentController.getDepartmentById);
 router.post('/departments', authenticate, requireAdmin, departmentController.createDepartment);
 router.put('/departments/:id', authenticate, requireAdmin, departmentController.updateDepartment);
@@ -40,5 +40,12 @@ router.get('/assignments/:id', authenticate, requireAdmin, assignmentController.
 router.post('/assignments', authenticate, requireAdmin, assignmentController.createAssignment);
 router.put('/assignments/:id/status', authenticate, requireAdmin, assignmentController.updateAssignmentStatus);
 router.delete('/assignments/:id', authenticate, requireAdmin, assignmentController.deleteAssignment);
+
+// Doctor-specific routes
+router.get('/my-assignments', authenticate, assignmentController.getMyAssignments);
+router.put('/my-assignments/:id/status', authenticate, assignmentController.updateMyAssignmentStatus);
+
+// Profile management routes
+router.put('/profile', authenticate, userController.updateProfile);
 
 module.exports = router; 

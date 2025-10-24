@@ -87,4 +87,11 @@ export const hmsApi = {
     getAssignmentsByPatient: (patientId) => request(`/assignments/patient/${patientId}`),
     getAssignmentsByDoctor: (doctorId) => request(`/assignments/doctor/${doctorId}`),
     getAvailableDoctors: () => request('/assignments/available-doctors'),
+
+    // Doctor-specific assignment methods
+    getMyAssignments: () => request('/my-assignments'),
+    updateMyAssignmentStatus: (id, body) => request(`/my-assignments/${id}/status`, { method: 'PUT', body: JSON.stringify(body) }),
+
+    // Profile management
+    updateProfile: (body) => request('/profile', { method: 'PUT', body: JSON.stringify(body) }),
 };

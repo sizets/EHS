@@ -125,8 +125,6 @@ const assignmentController = {
             const assignment = {
                 patientId: patientObjectId,
                 doctorId: doctorObjectId,
-                patientName: patient.name,
-                doctorName: doctor.name,
                 assignmentType: assignmentType.toLowerCase(),
                 priority: priority || (assignmentType.toLowerCase() === 'emergency' ? 'high' : 'normal'),
                 symptoms: symptoms?.trim() || '',
@@ -167,24 +165,41 @@ const assignmentController = {
                 .sort({ assignedAt: -1 })
                 .toArray();
 
-            // Get department names for assignments
+            // Get unique patient and doctor IDs
+            const patientIds = [...new Set(assignments.map(a => a.patientId))];
+            const doctorIds = [...new Set(assignments.map(a => a.doctorId))];
             const departmentIds = [...new Set(assignments.map(a => a.department).filter(Boolean))];
-            const departments = await dbInstance.collection('departments')
-                .find({ _id: { $in: departmentIds } })
-                .toArray();
+
+            // Fetch patients, doctors, and departments
+            const [patients, doctors, departments] = await Promise.all([
+                dbInstance.collection('users').find({ _id: { $in: patientIds } }).toArray(),
+                dbInstance.collection('users').find({ _id: { $in: doctorIds } }).toArray(),
+                dbInstance.collection('departments').find({ _id: { $in: departmentIds } }).toArray()
+            ]);
+
+            // Create lookup maps
+            const patientMap = {};
+            patients.forEach(patient => {
+                patientMap[patient._id.toString()] = patient.name;
+            });
+
+            const doctorMap = {};
+            doctors.forEach(doctor => {
+                doctorMap[doctor._id.toString()] = doctor.name;
+            });
 
             const departmentMap = {};
             departments.forEach(dept => {
                 departmentMap[dept._id.toString()] = dept.name;
             });
 
-            // Convert ObjectIds to strings for JSON response
+            // Format assignments with resolved names
             const formattedAssignments = assignments.map(assignment => ({
                 id: assignment._id.toString(),
                 patientId: assignment.patientId.toString(),
                 doctorId: assignment.doctorId.toString(),
-                patientName: assignment.patientName,
-                doctorName: assignment.doctorName,
+                patientName: patientMap[assignment.patientId.toString()] || 'Unknown Patient',
+                doctorName: doctorMap[assignment.doctorId.toString()] || 'Unknown Doctor',
                 assignmentType: assignment.assignmentType,
                 priority: assignment.priority,
                 symptoms: assignment.symptoms,
@@ -364,11 +379,22 @@ const assignmentController = {
                 .sort({ assignedAt: -1 })
                 .toArray();
 
-            // Get department names for assignments
+            // Get unique patient IDs and department IDs
+            const patientIds = [...new Set(assignments.map(a => a.patientId))];
             const departmentIds = [...new Set(assignments.map(a => a.department).filter(Boolean))];
-            const departments = await dbInstance.collection('departments')
-                .find({ _id: { $in: departmentIds } })
-                .toArray();
+
+            // Fetch patients, doctor, and departments
+            const [patients, doctor, departments] = await Promise.all([
+                dbInstance.collection('users').find({ _id: { $in: patientIds } }).toArray(),
+                dbInstance.collection('users').findOne({ _id: doctorObjectId }),
+                dbInstance.collection('departments').find({ _id: { $in: departmentIds } }).toArray()
+            ]);
+
+            // Create lookup maps
+            const patientMap = {};
+            patients.forEach(patient => {
+                patientMap[patient._id.toString()] = patient.name;
+            });
 
             const departmentMap = {};
             departments.forEach(dept => {
@@ -379,8 +405,8 @@ const assignmentController = {
                 id: assignment._id.toString(),
                 patientId: assignment.patientId.toString(),
                 doctorId: assignment.doctorId.toString(),
-                patientName: assignment.patientName,
-                doctorName: assignment.doctorName,
+                patientName: patientMap[assignment.patientId.toString()] || 'Unknown Patient',
+                doctorName: doctor ? doctor.name : 'Unknown Doctor',
                 assignmentType: assignment.assignmentType,
                 priority: assignment.priority,
                 symptoms: assignment.symptoms,
@@ -494,6 +520,139 @@ const assignmentController = {
 
         } catch (error) {
             console.error('Delete assignment error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    // Get assignments for the current doctor (doctor-specific)
+    getMyAssignments: async (req, res) => {
+        try {
+            const doctorId = req.user.id; // Get doctor ID from authenticated user
+
+            const doctorObjectId = safeObjectId(doctorId);
+            if (!doctorObjectId) {
+                return res.status(400).json({ error: 'Invalid doctor ID format' });
+            }
+
+            const dbInstance = await connectDB();
+
+            // Verify the user is a doctor
+            const doctor = await dbInstance.collection('users').findOne({
+                _id: doctorObjectId,
+                role: 'doctor'
+            });
+            if (!doctor) {
+                return res.status(403).json({ error: 'Access denied. Only doctors can view their assignments.' });
+            }
+
+            const assignments = await dbInstance.collection('assignments')
+                .find({ doctorId: doctorObjectId })
+                .sort({ assignedAt: -1 })
+                .toArray();
+
+            // Get unique patient IDs and department IDs
+            const patientIds = [...new Set(assignments.map(a => a.patientId))];
+            const departmentIds = [...new Set(assignments.map(a => a.department).filter(Boolean))];
+
+            // Fetch patients and departments
+            const [patients, departments] = await Promise.all([
+                dbInstance.collection('users').find({ _id: { $in: patientIds } }).toArray(),
+                dbInstance.collection('departments').find({ _id: { $in: departmentIds } }).toArray()
+            ]);
+
+            // Create lookup maps
+            const patientMap = {};
+            patients.forEach(patient => {
+                patientMap[patient._id.toString()] = patient.name;
+            });
+
+            const departmentMap = {};
+            departments.forEach(dept => {
+                departmentMap[dept._id.toString()] = dept.name;
+            });
+
+            const formattedAssignments = assignments.map(assignment => ({
+                id: assignment._id.toString(),
+                patientId: assignment.patientId.toString(),
+                doctorId: assignment.doctorId.toString(),
+                patientName: patientMap[assignment.patientId.toString()] || 'Unknown Patient',
+                doctorName: doctor.name, // Current doctor's name
+                assignmentType: assignment.assignmentType,
+                priority: assignment.priority,
+                symptoms: assignment.symptoms,
+                notes: assignment.notes,
+                department: assignment.department ? departmentMap[assignment.department.toString()] || 'Unknown' : 'Not assigned',
+                departmentId: assignment.department ? assignment.department.toString() : null,
+                status: assignment.status,
+                assignedBy: assignment.assignedBy,
+                assignedAt: assignment.assignedAt,
+                createdAt: assignment.createdAt,
+                updatedAt: assignment.updatedAt
+            }));
+
+            res.json({ assignments: formattedAssignments });
+        } catch (error) {
+            console.error('Get my assignments error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    // Update assignment status for the current doctor (doctor-specific)
+    updateMyAssignmentStatus: async (req, res) => {
+        try {
+            if (!req.body) {
+                return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
+            }
+
+            const { id } = req.params;
+            const { status, notes } = req.body;
+            const doctorId = req.user.id; // Get doctor ID from authenticated user
+
+            const objectId = safeObjectId(id);
+            if (!objectId) {
+                return res.status(400).json({ error: 'Invalid assignment ID format' });
+            }
+
+            // Validate status
+            const validStatuses = ['assigned', 'in_progress', 'completed', 'cancelled'];
+            if (!status || !validStatuses.includes(status.toLowerCase())) {
+                return res.status(400).json({ error: 'Valid status is required (assigned, in_progress, completed, cancelled)' });
+            }
+
+            const dbInstance = await connectDB();
+
+            // Check if assignment exists and belongs to this doctor
+            const existingAssignment = await dbInstance.collection('assignments').findOne({
+                _id: objectId,
+                doctorId: safeObjectId(doctorId)
+            });
+            if (!existingAssignment) {
+                return res.status(404).json({ error: 'Assignment not found or you do not have permission to update this assignment' });
+            }
+
+            // Update assignment
+            const updateData = {
+                status: status.toLowerCase(),
+                updatedAt: new Date()
+            };
+
+            if (notes) {
+                updateData.notes = notes.trim();
+            }
+
+            const result = await dbInstance.collection('assignments').updateOne(
+                { _id: objectId },
+                { $set: updateData }
+            );
+
+            if (result.matchedCount === 0) {
+                return res.status(404).json({ error: 'Assignment not found' });
+            }
+
+            res.json({ message: 'Assignment status updated successfully' });
+
+        } catch (error) {
+            console.error('Update my assignment status error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     }

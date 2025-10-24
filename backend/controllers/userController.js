@@ -460,6 +460,103 @@ const userController = {
             console.error('Get users by role error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
+    },
+
+    // Update user profile (for authenticated users to update their own profile)
+    updateProfile: async (req, res) => {
+        try {
+            if (!req.body) {
+                return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
+            }
+
+            const userId = req.user.id;
+            const { name, email, phone, address, specialization, department, schedule } = req.body;
+
+            const dbInstance = await connectDB();
+
+            // Check if user exists
+            const existingUser = await dbInstance.collection('users').findOne({
+                _id: safeObjectId(userId)
+            });
+
+            if (!existingUser) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Build update data
+            const updateData = {
+                updatedAt: new Date()
+            };
+
+            if (name) updateData.name = name.trim();
+            if (email) {
+                const trimmedEmail = email.trim().toLowerCase();
+                if (!validateEmail(trimmedEmail)) {
+                    return res.status(400).json({ error: 'Please provide a valid email address' });
+                }
+
+                // Check if email is already taken by another user
+                const emailExists = await dbInstance.collection('users').findOne({
+                    email: trimmedEmail,
+                    _id: { $ne: safeObjectId(userId) }
+                });
+
+                if (emailExists) {
+                    return res.status(400).json({ error: 'Email is already taken by another user' });
+                }
+
+                updateData.email = trimmedEmail;
+            }
+            if (phone !== undefined) updateData.phone = phone?.trim() || '';
+            if (address !== undefined) updateData.address = address?.trim() || '';
+
+            // Update role-specific fields for doctors
+            if (existingUser.role === 'doctor') {
+                if (specialization !== undefined) updateData.specialization = specialization?.trim() || '';
+                if (department) {
+                    // Validate department exists
+                    const departmentExists = await dbInstance.collection('departments').findOne({
+                        _id: safeObjectId(department)
+                    });
+                    if (!departmentExists) {
+                        return res.status(400).json({ error: 'Department not found' });
+                    }
+                    updateData.department = safeObjectId(department);
+                }
+                if (schedule) {
+                    updateData.schedule = schedule;
+                }
+            }
+
+            // Update user
+            const result = await dbInstance.collection('users').updateOne(
+                { _id: safeObjectId(userId) },
+                { $set: updateData }
+            );
+
+            if (result.matchedCount === 0) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Get updated user data
+            const updatedUser = await dbInstance.collection('users').findOne({
+                _id: safeObjectId(userId)
+            });
+
+            // Remove sensitive data
+            const { password, resetToken, resetTokenExpiry, ...safeUser } = updatedUser;
+            safeUser.id = updatedUser._id.toString();
+            delete safeUser._id;
+
+            res.json({
+                message: 'Profile updated successfully',
+                user: safeUser
+            });
+
+        } catch (error) {
+            console.error('Update profile error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
     }
 };
 
