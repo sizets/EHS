@@ -39,10 +39,10 @@ const Sidebar = () => {
             href: "/assignments",
             icon: "assignments",
           },
+          { name: "Doctors", href: "/doctors", icon: "doctors" },
         ]
       : []),
     { name: "Patients", href: "/patients", icon: "patients" },
-    { name: "Doctors", href: "/doctors", icon: "doctors" },
     { name: "Appointments", href: "/appointments", icon: "appointments" },
   ];
 

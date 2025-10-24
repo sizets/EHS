@@ -52,7 +52,7 @@ const CreateUserModal = ({ onClose, onSuccess }) => {
       const response = await hmsApi.getAllDepartments();
       setDepartments(response.departments || []);
     } catch (error) {
-      console.error("Error fetching departments:", error);
+      // Error handled by toast notification
     }
   };
 
@@ -69,7 +69,6 @@ const CreateUserModal = ({ onClose, onSuccess }) => {
       await hmsApi.createUser(formData);
       onSuccess();
     } catch (error) {
-      console.error("Error creating user:", error);
       toast.error(error.message || "Failed to create user");
     } finally {
       setLoading(false);
@@ -240,7 +239,7 @@ const CreateUserModal = ({ onClose, onSuccess }) => {
                   >
                     <option value="">Select Department</option>
                     {departments.map((dept) => (
-                      <option key={dept.id} value={dept.name}>
+                      <option key={dept.id} value={dept.id}>
                         {dept.name}
                       </option>
                     ))}

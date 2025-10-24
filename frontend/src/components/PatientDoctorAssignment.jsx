@@ -5,7 +5,7 @@ const PatientDoctorAssignment = ({ onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     patientId: "",
     doctorId: "",
-    assignmentType: "casual",
+    assignmentType: "emergency",
     priority: "normal",
     symptoms: "",
     notes: "",
@@ -29,12 +29,12 @@ const PatientDoctorAssignment = ({ onClose, onSuccess }) => {
       setLoading(true);
       const [patientsRes, doctorsRes, departmentsRes] = await Promise.all([
         hmsApi.getUsersByRole("patient"),
-        hmsApi.getUsersByRole("doctor"),
+        hmsApi.getAvailableDoctors(),
         hmsApi.getAllDepartments(),
       ]);
 
       setPatients(patientsRes.users || []);
-      setDoctors(doctorsRes.users || []);
+      setDoctors(doctorsRes.doctors || []);
       setDepartments(departmentsRes.departments || []);
     } catch (err) {
       setError("Failed to load data: " + err.message);
@@ -53,10 +53,10 @@ const PatientDoctorAssignment = ({ onClose, onSuccess }) => {
     // Auto-set department when doctor is selected
     if (name === "doctorId") {
       const selectedDoctor = doctors.find((doctor) => doctor.id === value);
-      if (selectedDoctor && selectedDoctor.department) {
+      if (selectedDoctor && selectedDoctor.departmentId) {
         setFormData((prev) => ({
           ...prev,
-          department: selectedDoctor.department,
+          department: selectedDoctor.departmentId,
         }));
       }
     }
@@ -73,24 +73,17 @@ const PatientDoctorAssignment = ({ onClose, onSuccess }) => {
 
     try {
       // Validate form
-      if (
-        !formData.patientId ||
-        !formData.doctorId ||
-        !formData.assignmentType
-      ) {
+      if (!formData.patientId || !formData.doctorId) {
         throw new Error("Please fill in all required fields");
       }
 
-      if (formData.assignmentType === "emergency" && !formData.priority) {
+      if (!formData.priority) {
         throw new Error("Priority is required for emergency assignments");
       }
 
       const assignmentData = {
         ...formData,
-        priority:
-          formData.assignmentType === "emergency"
-            ? formData.priority
-            : "normal",
+        priority: formData.priority,
       };
 
       const result = await hmsApi.createAssignment(assignmentData);
@@ -110,16 +103,10 @@ const PatientDoctorAssignment = ({ onClose, onSuccess }) => {
   };
 
   const getPriorityOptions = () => {
-    if (formData.assignmentType === "emergency") {
-      return [
-        { value: "critical", label: "Critical" },
-        { value: "high", label: "High" },
-        { value: "medium", label: "Medium" },
-      ];
-    }
     return [
-      { value: "normal", label: "Normal" },
-      { value: "low", label: "Low" },
+      { value: "critical", label: "Critical" },
+      { value: "high", label: "High" },
+      { value: "medium", label: "Medium" },
     ];
   };
 
@@ -199,12 +186,18 @@ const PatientDoctorAssignment = ({ onClose, onSuccess }) => {
                 required
               >
                 <option value="">Choose a doctor...</option>
-                {doctors.map((doctor) => (
-                  <option key={doctor.id} value={doctor.id}>
-                    {doctor.name} - {doctor.specialization || "General"} (
-                    {doctor.department || "No Department"})
+                {doctors.length === 0 ? (
+                  <option value="" disabled>
+                    No available emergency doctors
                   </option>
-                ))}
+                ) : (
+                  doctors.map((doctor) => (
+                    <option key={doctor.id} value={doctor.id}>
+                      {doctor.name} - {doctor.specialization || "General"} (
+                      {doctor.department || "No Department"})
+                    </option>
+                  ))
+                )}
               </select>
               {selectedDoctor && (
                 <div className="mt-2 p-2 bg-green-50 rounded text-sm">
@@ -217,85 +210,37 @@ const PatientDoctorAssignment = ({ onClose, onSuccess }) => {
                   <p>
                     Department: {selectedDoctor.department || "Not assigned"}
                   </p>
-                  <p>
-                    License: {selectedDoctor.licenseNumber || "Not provided"}
-                  </p>
+                  <p>Phone: {selectedDoctor.phone || "Not provided"}</p>
                 </div>
               )}
             </div>
 
-            {/* Assignment Type */}
+            {/* Priority */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Assignment Type *
-              </label>
-              <div className="flex space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="assignmentType"
-                    value="casual"
-                    checked={formData.assignmentType === "casual"}
-                    onChange={handleInputChange}
-                    className="mr-2"
-                  />
-                  <span className="text-green-600 font-medium">Casual</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="assignmentType"
-                    value="emergency"
-                    checked={formData.assignmentType === "emergency"}
-                    onChange={handleInputChange}
-                    className="mr-2"
-                  />
-                  <span className="text-red-600 font-medium">Emergency</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Priority (only for emergency) */}
-            {formData.assignmentType === "emergency" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Priority Level *
-                </label>
-                <select
-                  name="priority"
-                  value={formData.priority}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                  required
-                >
-                  {getPriorityOptions().map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Department */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Department
+                Priority Level *
               </label>
               <select
-                name="department"
-                value={formData.department}
+                name="priority"
+                value={formData.priority}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                required
               >
-                <option value="">Auto-selected from doctor</option>
-                {departments.map((dept) => (
-                  <option key={dept.id} value={dept.name}>
-                    {dept.name}
+                {getPriorityOptions().map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
             </div>
+
+            {/* Department - Hidden field with department ID */}
+            <input
+              type="hidden"
+              name="department"
+              value={formData.department}
+            />
 
             {/* Symptoms */}
             <div>
@@ -340,13 +285,11 @@ const PatientDoctorAssignment = ({ onClose, onSuccess }) => {
               <button
                 type="submit"
                 disabled={loading}
-                className={`px-6 py-2 rounded-md font-medium transition-colors ${
-                  formData.assignmentType === "emergency"
-                    ? "bg-red-600 hover:bg-red-700 text-white"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={`px-6 py-2 rounded-md font-medium transition-colors bg-red-600 hover:bg-red-700 text-white ${
+                  loading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
-                {loading ? "Creating..." : "Create Assignment"}
+                {loading ? "Creating..." : "Create Emergency Assignment"}
               </button>
             </div>
           </form>

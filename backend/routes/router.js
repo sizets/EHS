@@ -7,17 +7,12 @@ const assignmentController = require('../controllers/assignmentController');
 const authenticate = require('../middleware/authenticate');
 const requireAdmin = require('../middleware/requireAdmin');
 
-router.get('/ping', (req, res) => {
-    res.status(200).json({ message: 'PING endpoint' });
-});
-
 // Auth Controller (Public routes)
 router.post('/login', authController.login);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
 router.get('/logout', authenticate, authController.logout);
 router.get('/profile', authenticate, authController.getProfile);
-router.post('/test-email', authController.testEmail);
 router.post('/contact', authController.contact);
 router.post('/subscribe', authController.subscribe);
 
@@ -38,11 +33,12 @@ router.delete('/departments/:id', authenticate, requireAdmin, departmentControll
 
 // Assignment Management Routes (Admin only)
 router.get('/assignments', authenticate, requireAdmin, assignmentController.getAllAssignments);
+router.get('/assignments/available-doctors', authenticate, requireAdmin, assignmentController.getAvailableDoctors);
+router.get('/assignments/patient/:patientId', authenticate, requireAdmin, assignmentController.getAssignmentsByPatient);
+router.get('/assignments/doctor/:doctorId', authenticate, requireAdmin, assignmentController.getAssignmentsByDoctor);
 router.get('/assignments/:id', authenticate, requireAdmin, assignmentController.getAssignmentById);
 router.post('/assignments', authenticate, requireAdmin, assignmentController.createAssignment);
 router.put('/assignments/:id/status', authenticate, requireAdmin, assignmentController.updateAssignmentStatus);
 router.delete('/assignments/:id', authenticate, requireAdmin, assignmentController.deleteAssignment);
-router.get('/assignments/patient/:patientId', authenticate, requireAdmin, assignmentController.getAssignmentsByPatient);
-router.get('/assignments/doctor/:doctorId', authenticate, requireAdmin, assignmentController.getAssignmentsByDoctor);
 
 module.exports = router; 
