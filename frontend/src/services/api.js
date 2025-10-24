@@ -1,4 +1,4 @@
-export const API_BASE = "http://localhost:4000/api";
+export const API_BASE = "http://localhost:8081/api";
 
 function getAuthHeaders() {
     const token = localStorage.getItem('token');
@@ -77,4 +77,13 @@ export const hmsApi = {
     createDepartment: (body) => request('/departments', { method: 'POST', body: JSON.stringify(body) }),
     updateDepartment: (id, body) => request(`/departments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     deleteDepartment: (id) => request(`/departments/${id}`, { method: 'DELETE' }),
+
+    // Assignment Management (Admin only)
+    getAllAssignments: () => request('/assignments'),
+    getAssignmentById: (id) => request(`/assignments/${id}`),
+    createAssignment: (body) => request('/assignments', { method: 'POST', body: JSON.stringify(body) }),
+    updateAssignmentStatus: (id, body) => request(`/assignments/${id}/status`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteAssignment: (id) => request(`/assignments/${id}`, { method: 'DELETE' }),
+    getAssignmentsByPatient: (patientId) => request(`/assignments/patient/${patientId}`),
+    getAssignmentsByDoctor: (doctorId) => request(`/assignments/doctor/${doctorId}`),
 };

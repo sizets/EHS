@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
 import UserManagement from "./pages/UserManagement";
 import DepartmentManagement from "./pages/DepartmentManagement";
+import AssignmentManagement from "./pages/AssignmentManagement";
 
 const App = () => {
   return (
@@ -42,6 +43,14 @@ const App = () => {
           element={
             <ProtectedRoute requiredRole="admin">
               <DepartmentManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/assignments"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AssignmentManagement />
             </ProtectedRoute>
           }
         />

@@ -1,6 +1,23 @@
 const { ObjectId } = require('mongodb');
 const connectDB = require('../mongo');
 
+// Helper function to safely convert string ID to ObjectId
+const safeObjectId = (id) => {
+    if (!id) return null;
+
+    // If it's already an ObjectId, return it
+    if (id instanceof ObjectId) return id;
+
+    // If it's a string, validate and convert
+    if (typeof id === 'string') {
+        if (ObjectId.isValid(id)) {
+            return objectId;
+        }
+    }
+
+    return null;
+};
+
 const departmentController = {
     // Get all departments
     getAllDepartments: async (req, res) => {
@@ -30,14 +47,14 @@ const departmentController = {
         try {
             const { id } = req.params;
 
-            // Validate ObjectId format
-            if (!ObjectId.isValid(id)) {
+            const objectId = safeObjectId(id);
+            if (!objectId) {
                 return res.status(400).json({ error: 'Invalid department ID format' });
             }
 
             const dbInstance = await connectDB();
 
-            const department = await dbInstance.collection('departments').findOne({ _id: new ObjectId(id) });
+            const department = await dbInstance.collection('departments').findOne({ _id: objectId });
 
             if (!department) {
                 return res.status(404).json({ error: 'Department not found' });
@@ -115,15 +132,15 @@ const departmentController = {
             const { id } = req.params;
             const { name, description } = req.body;
 
-            // Validate ObjectId format
-            if (!ObjectId.isValid(id)) {
+            const objectId = safeObjectId(id);
+            if (!objectId) {
                 return res.status(400).json({ error: 'Invalid department ID format' });
             }
 
             const dbInstance = await connectDB();
 
             // Check if department exists
-            const existingDepartment = await dbInstance.collection('departments').findOne({ _id: new ObjectId(id) });
+            const existingDepartment = await dbInstance.collection('departments').findOne({ _id: objectId });
             if (!existingDepartment) {
                 return res.status(404).json({ error: 'Department not found' });
             }
@@ -138,7 +155,7 @@ const departmentController = {
                 if (name !== existingDepartment.name) {
                     const nameExists = await dbInstance.collection('departments').findOne({
                         name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
-                        _id: { $ne: new ObjectId(id) }
+                        _id: { $ne: objectId }
                     });
 
                     if (nameExists) {
@@ -153,7 +170,7 @@ const departmentController = {
             }
 
             const result = await dbInstance.collection('departments').updateOne(
-                { _id: new ObjectId(id) },
+                { _id: objectId },
                 { $set: updateData }
             );
 
@@ -165,7 +182,7 @@ const departmentController = {
                 message: 'Department updated successfully',
                 department: {
                     id: id,
-                    _id: new ObjectId(id),
+                    _id: objectId,
                     name: updateData.name || existingDepartment.name,
                     description: updateData.description !== undefined ? updateData.description : existingDepartment.description,
                     createdAt: existingDepartment.createdAt,
@@ -192,7 +209,7 @@ const departmentController = {
             const dbInstance = await connectDB();
 
             // Check if department exists
-            const existingDepartment = await dbInstance.collection('departments').findOne({ _id: new ObjectId(id) });
+            const existingDepartment = await dbInstance.collection('departments').findOne({ _id: objectId });
             if (!existingDepartment) {
                 return res.status(404).json({ error: 'Department not found' });
             }
@@ -208,7 +225,7 @@ const departmentController = {
                 });
             }
 
-            const result = await dbInstance.collection('departments').deleteOne({ _id: new ObjectId(id) });
+            const result = await dbInstance.collection('departments').deleteOne({ _id: objectId });
 
             if (result.deletedCount === 0) {
                 return res.status(404).json({ error: 'Department not found' });

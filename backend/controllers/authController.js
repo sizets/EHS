@@ -21,12 +21,40 @@ try {
     console.log('❌ Courier email service not available:', error.message);
 }
 
+// Validation helper functions
+const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+};
+
+const validatePassword = (password) => {
+    if (!password || password.length < 6) {
+        return { isValid: false, message: 'Password must be at least 6 characters long' };
+    }
+    return { isValid: true };
+};
+
 const authController = {
     login: async (req, res) => {
+        // Check if req.body exists
+        if (!req.body) {
+            return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
+        }
+
         const { email, password } = req.body;
 
+        // Enhanced validation
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required' });
+        }
+
+        if (!validateEmail(email.trim())) {
+            return res.status(400).json({ error: 'Please provide a valid email address' });
+        }
+
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
+            return res.status(400).json({ error: passwordValidation.message });
         }
 
         try {
@@ -90,10 +118,27 @@ const authController = {
     },
 
     contact: async (req, res) => {
+        // Check if req.body exists
+        if (!req.body) {
+            return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
+        }
+
         const { name, email, message, subject } = req.body;
 
         if (!name || !email || !message || !subject) {
             return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        if (!validateEmail(email.trim())) {
+            return res.status(400).json({ error: 'Please provide a valid email address' });
+        }
+
+        if (name.trim().length < 2) {
+            return res.status(400).json({ error: 'Name must be at least 2 characters long' });
+        }
+
+        if (message.trim().length < 10) {
+            return res.status(400).json({ error: 'Message must be at least 10 characters long' });
         }
 
         try {
@@ -113,10 +158,19 @@ const authController = {
     },
 
     subscribe: async (req, res) => {
+        // Check if req.body exists
+        if (!req.body) {
+            return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
+        }
+
         const { email } = req.body;
 
         if (!email) {
             return res.status(400).json({ error: 'Email is required' });
+        }
+
+        if (!validateEmail(email.trim())) {
+            return res.status(400).json({ error: 'Please provide a valid email address' });
         }
 
         try {
@@ -133,10 +187,19 @@ const authController = {
     },
 
     forgotPassword: async (req, res) => {
+        // Check if req.body exists
+        if (!req.body) {
+            return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
+        }
+
         const { email } = req.body;
 
         if (!email) {
             return res.status(400).json({ error: 'Email is required' });
+        }
+
+        if (!validateEmail(email.trim())) {
+            return res.status(400).json({ error: 'Please provide a valid email address' });
         }
 
         try {
@@ -208,10 +271,20 @@ const authController = {
     },
 
     resetPassword: async (req, res) => {
+        // Check if req.body exists
+        if (!req.body) {
+            return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
+        }
+
         const { token, newPassword } = req.body;
 
         if (!token || !newPassword) {
             return res.status(400).json({ error: 'Token and new password are required' });
+        }
+
+        const passwordValidation = validatePassword(newPassword);
+        if (!passwordValidation.isValid) {
+            return res.status(400).json({ error: passwordValidation.message });
         }
 
         try {
