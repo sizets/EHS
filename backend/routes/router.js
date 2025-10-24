@@ -3,6 +3,7 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
 const departmentController = require('../controllers/departmentController');
+const assignmentController = require('../controllers/assignmentController');
 const authenticate = require('../middleware/authenticate');
 const requireAdmin = require('../middleware/requireAdmin');
 
@@ -34,5 +35,14 @@ router.get('/departments/:id', authenticate, requireAdmin, departmentController.
 router.post('/departments', authenticate, requireAdmin, departmentController.createDepartment);
 router.put('/departments/:id', authenticate, requireAdmin, departmentController.updateDepartment);
 router.delete('/departments/:id', authenticate, requireAdmin, departmentController.deleteDepartment);
+
+// Assignment Management Routes (Admin only)
+router.get('/assignments', authenticate, requireAdmin, assignmentController.getAllAssignments);
+router.get('/assignments/:id', authenticate, requireAdmin, assignmentController.getAssignmentById);
+router.post('/assignments', authenticate, requireAdmin, assignmentController.createAssignment);
+router.put('/assignments/:id/status', authenticate, requireAdmin, assignmentController.updateAssignmentStatus);
+router.delete('/assignments/:id', authenticate, requireAdmin, assignmentController.deleteAssignment);
+router.get('/assignments/patient/:patientId', authenticate, requireAdmin, assignmentController.getAssignmentsByPatient);
+router.get('/assignments/doctor/:doctorId', authenticate, requireAdmin, assignmentController.getAssignmentsByDoctor);
 
 module.exports = router; 

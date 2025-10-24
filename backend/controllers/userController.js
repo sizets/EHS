@@ -3,6 +3,36 @@ const { ObjectId } = require('mongodb');
 const connectDB = require('../mongo');
 const authController = require('./authController');
 
+// Validation helper functions
+const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+};
+
+const validatePassword = (password) => {
+    if (!password || password.length < 6) {
+        return { isValid: false, message: 'Password must be at least 6 characters long' };
+    }
+    return { isValid: true };
+};
+
+// Helper function to safely convert string ID to ObjectId
+const safeObjectId = (id) => {
+    if (!id) return null;
+
+    // If it's already an ObjectId, return it
+    if (id instanceof ObjectId) return id;
+
+    // If it's a string, validate and convert
+    if (typeof id === 'string') {
+        if (ObjectId.isValid(id)) {
+            return new ObjectId(id);
+        }
+    }
+
+    return null;
+};
+
 const userController = {
     // Get all users (Admin only)
     getAllUsers: async (req, res) => {
@@ -13,6 +43,9 @@ const userController = {
             // Remove passwords from response
             const safeUsers = users.map(user => {
                 const { password, resetToken, resetTokenExpiry, ...safeUser } = user;
+                // Convert _id to id and ensure it's a string
+                safeUser.id = user._id.toString();
+                delete safeUser._id;
                 return safeUser;
             });
 
@@ -28,14 +61,15 @@ const userController = {
         try {
             const { id } = req.params;
 
-            // Validate ObjectId format
-            if (!ObjectId.isValid(id)) {
+            // Safely convert ID to ObjectId
+            const objectId = safeObjectId(id);
+            if (!objectId) {
                 return res.status(400).json({ error: 'Invalid user ID format' });
             }
 
             const dbInstance = await connectDB();
 
-            const user = await dbInstance.collection('users').findOne({ _id: new ObjectId(id) });
+            const user = await dbInstance.collection('users').findOne({ _id: objectId });
 
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
@@ -43,6 +77,8 @@ const userController = {
 
             // Remove sensitive data
             const { password, resetToken, resetTokenExpiry, ...safeUser } = user;
+            safeUser.id = user._id.toString();
+            delete safeUser._id;
             res.json({ user: safeUser });
         } catch (error) {
             console.error('Get user by ID error:', error);
@@ -53,11 +89,34 @@ const userController = {
     // Create new user (Admin only)
     createUser: async (req, res) => {
         try {
-            const { name, email, password, role, phone, dateOfBirth, address, specialization, licenseNumber, department, emergencyContact, medicalHistory, allergies } = req.body;
+            // Check if req.body exists
+            if (!req.body) {
+                return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
+            }
 
-            // Validation
+            const { name, email, password, role, phone, dateOfBirth, address, specialization, department, emergencyContact, medicalHistory, allergies } = req.body;
+
+            // Enhanced validation
             if (!name || !email || !password || !role) {
                 return res.status(400).json({ error: 'Name, email, password, and role are required' });
+            }
+
+            // Additional validation for doctor role
+            if (role.toLowerCase() === 'doctor' && !department) {
+                return res.status(400).json({ error: 'Department is required for doctor users' });
+            }
+
+            if (!validateEmail(email.trim())) {
+                return res.status(400).json({ error: 'Please provide a valid email address' });
+            }
+
+            const passwordValidation = validatePassword(password);
+            if (!passwordValidation.isValid) {
+                return res.status(400).json({ error: passwordValidation.message });
+            }
+
+            if (name.trim().length < 2) {
+                return res.status(400).json({ error: 'Name must be at least 2 characters long' });
             }
 
             // Validate role
@@ -96,7 +155,6 @@ const userController = {
             // Add role-specific fields
             if (role.toLowerCase() === 'doctor') {
                 user.specialization = specialization?.trim() || '';
-                user.licenseNumber = licenseNumber?.trim() || '';
                 user.department = department?.trim() || '';
             } else if (role.toLowerCase() === 'patient') {
                 user.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
@@ -128,19 +186,18 @@ const userController = {
 
             // Remove password from response
             delete user.password;
-            user.id = result.insertedId;
+            user.id = result.insertedId.toString();
 
             res.status(201).json({
                 message: 'User created successfully',
                 user: {
-                    id: result.insertedId,
+                    id: result.insertedId.toString(),
                     name: user.name,
                     email: user.email,
                     role: user.role,
                     phone: user.phone,
                     address: user.address,
                     specialization: user.specialization || '',
-                    licenseNumber: user.licenseNumber || '',
                     department: user.department || '',
                     dateOfBirth: user.dateOfBirth || null,
                     emergencyContact: user.emergencyContact || '',
@@ -160,18 +217,40 @@ const userController = {
     // Update user
     updateUser: async (req, res) => {
         try {
-            const { id } = req.params;
-            const { name, email, role, password, phone, dateOfBirth, address, specialization, licenseNumber, department, emergencyContact, medicalHistory, allergies } = req.body;
+            // Check if req.body exists
+            if (!req.body) {
+                return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
+            }
 
-            // Validate ObjectId format
-            if (!ObjectId.isValid(id)) {
+            const { id } = req.params;
+            const { name, email, role, password, phone, dateOfBirth, address, specialization, department, emergencyContact, medicalHistory, allergies } = req.body;
+
+            // Safely convert ID to ObjectId
+            const objectId = safeObjectId(id);
+            if (!objectId) {
                 return res.status(400).json({ error: 'Invalid user ID format' });
+            }
+
+            // Enhanced validation for provided fields
+            if (email && !validateEmail(email.trim())) {
+                return res.status(400).json({ error: 'Please provide a valid email address' });
+            }
+
+            if (name && name.trim().length < 2) {
+                return res.status(400).json({ error: 'Name must be at least 2 characters long' });
+            }
+
+            if (password) {
+                const passwordValidation = validatePassword(password);
+                if (!passwordValidation.isValid) {
+                    return res.status(400).json({ error: passwordValidation.message });
+                }
             }
 
             const dbInstance = await connectDB();
 
             // Check if user exists
-            const existingUser = await dbInstance.collection('users').findOne({ _id: new ObjectId(id) });
+            const existingUser = await dbInstance.collection('users').findOne({ _id: objectId });
             if (!existingUser) {
                 return res.status(404).json({ error: 'User not found' });
             }
@@ -197,8 +276,10 @@ const userController = {
 
                 // Clear role-specific fields when role changes
                 if (role.toLowerCase() === 'doctor') {
+                    if (!department) {
+                        return res.status(400).json({ error: 'Department is required for doctor users' });
+                    }
                     updateData.specialization = specialization?.trim() || '';
-                    updateData.licenseNumber = licenseNumber?.trim() || '';
                     updateData.department = department?.trim() || '';
                     // Clear patient fields
                     updateData.dateOfBirth = null;
@@ -212,12 +293,10 @@ const userController = {
                     updateData.allergies = allergies?.trim() || '';
                     // Clear doctor fields
                     updateData.specialization = '';
-                    updateData.licenseNumber = '';
                     updateData.department = '';
                 } else if (role.toLowerCase() === 'admin') {
                     // Clear all role-specific fields for admin
                     updateData.specialization = '';
-                    updateData.licenseNumber = '';
                     updateData.department = '';
                     updateData.dateOfBirth = null;
                     updateData.emergencyContact = '';
@@ -228,8 +307,12 @@ const userController = {
                 // If role is not being updated, only update the specific fields for current role
                 if (existingUser.role === 'doctor') {
                     if (specialization !== undefined) updateData.specialization = specialization?.trim() || '';
-                    if (licenseNumber !== undefined) updateData.licenseNumber = licenseNumber?.trim() || '';
-                    if (department !== undefined) updateData.department = department?.trim() || '';
+                    if (department !== undefined) {
+                        if (!department) {
+                            return res.status(400).json({ error: 'Department is required for doctor users' });
+                        }
+                        updateData.department = department?.trim() || '';
+                    }
                 } else if (existingUser.role === 'patient') {
                     if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
                     if (emergencyContact !== undefined) updateData.emergencyContact = emergencyContact?.trim() || '';
@@ -247,7 +330,7 @@ const userController = {
             if (email && email !== existingUser.email) {
                 const emailExists = await dbInstance.collection('users').findOne({
                     email: email.trim().toLowerCase(),
-                    _id: { $ne: new ObjectId(id) }
+                    _id: { $ne: objectId }
                 });
                 if (emailExists) {
                     return res.status(409).json({ error: 'Email already exists' });
@@ -255,7 +338,7 @@ const userController = {
             }
 
             const result = await dbInstance.collection('users').updateOne(
-                { _id: new ObjectId(id) },
+                { _id: objectId },
                 { $set: updateData }
             );
 
@@ -276,15 +359,16 @@ const userController = {
         try {
             const { id } = req.params;
 
-            // Validate ObjectId format
-            if (!ObjectId.isValid(id)) {
+            // Safely convert ID to ObjectId
+            const objectId = safeObjectId(id);
+            if (!objectId) {
                 return res.status(400).json({ error: 'Invalid user ID format' });
             }
 
             const dbInstance = await connectDB();
 
             // Check if user exists
-            const user = await dbInstance.collection('users').findOne({ _id: new ObjectId(id) });
+            const user = await dbInstance.collection('users').findOne({ _id: objectId });
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
             }
@@ -294,7 +378,7 @@ const userController = {
                 return res.status(400).json({ error: 'Cannot delete your own account' });
             }
 
-            const result = await dbInstance.collection('users').deleteOne({ _id: new ObjectId(id) });
+            const result = await dbInstance.collection('users').deleteOne({ _id: objectId });
 
             if (result.deletedCount === 0) {
                 return res.status(404).json({ error: 'User not found' });
@@ -326,6 +410,9 @@ const userController = {
             // Remove passwords from response
             const safeUsers = users.map(user => {
                 const { password, resetToken, resetTokenExpiry, ...safeUser } = user;
+                // Convert _id to id and ensure it's a string
+                safeUser.id = user._id.toString();
+                delete safeUser._id;
                 return safeUser;
             });
 

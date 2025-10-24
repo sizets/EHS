@@ -12,7 +12,6 @@ const EditUserModal = ({ user, onClose, onSuccess }) => {
     address: user.address || "",
     // Doctor fields
     specialization: user.specialization || "",
-    licenseNumber: user.licenseNumber || "",
     department: user.department || "",
     // Patient fields
     dateOfBirth: user.dateOfBirth
@@ -81,7 +80,6 @@ const EditUserModal = ({ user, onClose, onSuccess }) => {
       // Add role-specific fields
       if (formData.role === "doctor") {
         updateData.specialization = formData.specialization;
-        updateData.licenseNumber = formData.licenseNumber;
         updateData.department = formData.department;
       } else if (formData.role === "patient") {
         updateData.dateOfBirth = formData.dateOfBirth;
@@ -255,26 +253,14 @@ const EditUserModal = ({ user, onClose, onSuccess }) => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    License Number
-                  </label>
-                  <input
-                    type="text"
-                    name="licenseNumber"
-                    value={formData.licenseNumber}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Department
+                    Department *
                   </label>
                   <select
                     name="department"
                     value={formData.department}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
                   >
                     <option value="">Select Department</option>
                     {departments.map((dept) => (

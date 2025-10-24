@@ -127,7 +127,7 @@ const UserManagement = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredUsers.map((user) => (
-                <tr key={user._id} className="hover:bg-gray-50">
+                <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
                       {user.name}
@@ -161,7 +161,7 @@ const UserManagement = () => {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteUser(user._id, user.name)}
+                        onClick={() => handleDeleteUser(user.id, user.name)}
                         className="text-red-600 hover:text-red-900"
                       >
                         Delete
