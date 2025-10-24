@@ -3,12 +3,16 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
     "dev": "nodemon index.js",
     "create-admin": "node scripts/createAdmin.js"
   },
-  "keywords": ["hospital", "management", "system", "healthcare"],
+  "keywords": [
+    "hospital",
+    "management",
+    "system",
+    "healthcare"
+  ],
   "author": "HospitalMS",
   "license": "ISC",
   "description": "Hospital Management System Backend API",

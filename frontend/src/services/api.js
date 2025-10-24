@@ -86,4 +86,5 @@ export const hmsApi = {
     deleteAssignment: (id) => request(`/assignments/${id}`, { method: 'DELETE' }),
     getAssignmentsByPatient: (patientId) => request(`/assignments/patient/${patientId}`),
     getAssignmentsByDoctor: (doctorId) => request(`/assignments/doctor/${doctorId}`),
+    getAvailableDoctors: () => request('/assignments/available-doctors'),
 };

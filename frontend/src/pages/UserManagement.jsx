@@ -24,7 +24,6 @@ const UserManagement = () => {
       const response = await hmsApi.getAllUsers();
       setUsers(response.users || []);
     } catch (error) {
-      console.error("Error fetching users:", error);
       toast.error("Failed to fetch users");
     } finally {
       setLoading(false);
@@ -44,7 +43,6 @@ const UserManagement = () => {
       toast.success("User deleted successfully");
       fetchUsers();
     } catch (error) {
-      console.error("Error deleting user:", error);
       toast.error(error.message || "Failed to delete user");
     } finally {
       setShowConfirmModal(false);

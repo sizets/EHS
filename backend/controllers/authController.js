@@ -367,43 +367,6 @@ const authController = {
     },
 
 
-    // Test Courier email functionality
-    testEmail: async (req, res) => {
-        const { email } = req.body;
-
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required' });
-        }
-
-        if (!courier || !process.env.COURIER_AUTH_TOKEN) {
-            return res.status(500).json({ error: 'Courier email service not configured' });
-        }
-
-        try {
-            const { requestId } = await courier.send({
-                message: {
-                    to: {
-                        email: email,
-                    },
-                    template: process.env.COURIER_TEMPLATE_ID || "test-email",
-                    data: {
-                        userName: 'Test User',
-                        hospitalName: 'HospitalMS',
-                        message: 'This is a test email from HospitalMS'
-                    },
-                },
-            });
-
-            return res.status(200).json({
-                message: 'Test email sent successfully',
-                requestId: requestId
-            });
-
-        } catch (error) {
-            console.error('Test Email Error:', error);
-            return res.status(500).json({ error: 'Failed to send test email' });
-        }
-    }
 };
 
 module.exports = authController;

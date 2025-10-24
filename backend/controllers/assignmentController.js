@@ -98,6 +98,29 @@ const assignmentController = {
                 });
             }
 
+            // Handle department - use provided department ID or doctor's department
+            let departmentId = null;
+            if (department) {
+                const departmentObjectId = safeObjectId(department);
+                if (!departmentObjectId) {
+                    return res.status(400).json({ error: 'Invalid department ID format' });
+                }
+
+                // Verify department exists
+                const departmentExists = await dbInstance.collection('departments').findOne({
+                    _id: departmentObjectId
+                });
+
+                if (!departmentExists) {
+                    return res.status(400).json({ error: 'Department not found' });
+                }
+
+                departmentId = departmentObjectId;
+            } else if (doctor.department) {
+                // Use doctor's department if no department specified
+                departmentId = doctor.department;
+            }
+
             // Create assignment
             const assignment = {
                 patientId: patientObjectId,
@@ -108,7 +131,7 @@ const assignmentController = {
                 priority: priority || (assignmentType.toLowerCase() === 'emergency' ? 'high' : 'normal'),
                 symptoms: symptoms?.trim() || '',
                 notes: notes?.trim() || '',
-                department: department?.trim() || doctor.department || '',
+                department: departmentId,
                 status: 'assigned',
                 assignedBy: req.user.id, // Admin who created the assignment
                 assignedAt: new Date(),
@@ -121,7 +144,7 @@ const assignmentController = {
             res.status(201).json({
                 message: 'Assignment created successfully',
                 assignment: {
-                    id: result.insertedId,
+                    id: result.insertedId.toString(),
                     ...assignment,
                     patientId: assignment.patientId.toString(),
                     doctorId: assignment.doctorId.toString(),
@@ -144,6 +167,17 @@ const assignmentController = {
                 .sort({ assignedAt: -1 })
                 .toArray();
 
+            // Get department names for assignments
+            const departmentIds = [...new Set(assignments.map(a => a.department).filter(Boolean))];
+            const departments = await dbInstance.collection('departments')
+                .find({ _id: { $in: departmentIds } })
+                .toArray();
+
+            const departmentMap = {};
+            departments.forEach(dept => {
+                departmentMap[dept._id.toString()] = dept.name;
+            });
+
             // Convert ObjectIds to strings for JSON response
             const formattedAssignments = assignments.map(assignment => ({
                 id: assignment._id.toString(),
@@ -155,7 +189,8 @@ const assignmentController = {
                 priority: assignment.priority,
                 symptoms: assignment.symptoms,
                 notes: assignment.notes,
-                department: assignment.department,
+                department: assignment.department ? departmentMap[assignment.department.toString()] || 'Unknown' : 'Not assigned',
+                departmentId: assignment.department ? assignment.department.toString() : null,
                 status: assignment.status,
                 assignedBy: assignment.assignedBy,
                 assignedAt: assignment.assignedAt,
@@ -329,6 +364,17 @@ const assignmentController = {
                 .sort({ assignedAt: -1 })
                 .toArray();
 
+            // Get department names for assignments
+            const departmentIds = [...new Set(assignments.map(a => a.department).filter(Boolean))];
+            const departments = await dbInstance.collection('departments')
+                .find({ _id: { $in: departmentIds } })
+                .toArray();
+
+            const departmentMap = {};
+            departments.forEach(dept => {
+                departmentMap[dept._id.toString()] = dept.name;
+            });
+
             const formattedAssignments = assignments.map(assignment => ({
                 id: assignment._id.toString(),
                 patientId: assignment.patientId.toString(),
@@ -339,7 +385,8 @@ const assignmentController = {
                 priority: assignment.priority,
                 symptoms: assignment.symptoms,
                 notes: assignment.notes,
-                department: assignment.department,
+                department: assignment.department ? departmentMap[assignment.department.toString()] || 'Unknown' : 'Not assigned',
+                departmentId: assignment.department ? assignment.department.toString() : null,
                 status: assignment.status,
                 assignedBy: assignment.assignedBy,
                 assignedAt: assignment.assignedAt,
@@ -350,6 +397,67 @@ const assignmentController = {
             res.json({ assignments: formattedAssignments });
         } catch (error) {
             console.error('Get assignments by doctor error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    // Get available doctors (emergency department + free)
+    getAvailableDoctors: async (req, res) => {
+        try {
+            const dbInstance = await connectDB();
+
+            // First, find the Emergency department ID (look for any department with "Emergency" in the name)
+            const emergencyDept = await dbInstance.collection('departments').findOne({
+                name: { $regex: /Emergency/i }
+            });
+
+            if (!emergencyDept) {
+                return res.json({ doctors: [] });
+            }
+
+            // Get all doctors from emergency department
+            const emergencyDoctors = await dbInstance.collection('users').find({
+                role: 'doctor',
+                department: emergencyDept._id
+            }).toArray();
+
+            if (emergencyDoctors.length === 0) {
+                return res.json({ doctors: [] });
+            }
+
+            // Get doctor IDs
+            const doctorIds = emergencyDoctors.map(doctor => doctor._id);
+
+            // Find doctors who have active assignments (status: 'in_progress')
+            const busyDoctors = await dbInstance.collection('assignments').find({
+                doctorId: { $in: doctorIds },
+                status: 'in_progress'
+            }).toArray();
+
+            // Get IDs of busy doctors
+            const busyDoctorIds = busyDoctors.map(assignment => assignment.doctorId);
+
+            // Filter out busy doctors
+            const availableDoctors = emergencyDoctors.filter(doctor =>
+                !busyDoctorIds.some(busyId => busyId.toString() === doctor._id.toString())
+            );
+
+            // Format response
+            const formattedDoctors = availableDoctors.map(doctor => ({
+                id: doctor._id.toString(),
+                name: doctor.name,
+                email: doctor.email,
+                specialization: doctor.specialization || '',
+                department: emergencyDept.name, // Return department name for compatibility
+                departmentId: doctor.department ? doctor.department.toString() : null,
+                phone: doctor.phone || '',
+                address: doctor.address || ''
+            }));
+
+            res.json({ doctors: formattedDoctors });
+
+        } catch (error) {
+            console.error('Get available doctors error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     },

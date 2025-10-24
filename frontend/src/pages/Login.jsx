@@ -41,7 +41,6 @@ const Login = () => {
         throw new Error("Invalid login response");
       }
     } catch (error) {
-      console.error("Auth error:", error);
       const errorMessage = error.message || "Something went wrong";
       toast.error(errorMessage);
     } finally {

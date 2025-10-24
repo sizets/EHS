@@ -12,7 +12,7 @@ const EditUserModal = ({ user, onClose, onSuccess }) => {
     address: user.address || "",
     // Doctor fields
     specialization: user.specialization || "",
-    department: user.department || "",
+    department: user.departmentId || "",
     // Patient fields
     dateOfBirth: user.dateOfBirth
       ? new Date(user.dateOfBirth).toISOString().split("T")[0]
@@ -54,7 +54,7 @@ const EditUserModal = ({ user, onClose, onSuccess }) => {
       const response = await hmsApi.getAllDepartments();
       setDepartments(response.departments || []);
     } catch (error) {
-      console.error("Error fetching departments:", error);
+      // Error handled by toast notification
     }
   };
 
@@ -96,7 +96,6 @@ const EditUserModal = ({ user, onClose, onSuccess }) => {
       await hmsApi.updateUser(user._id, updateData);
       onSuccess();
     } catch (error) {
-      console.error("Error updating user:", error);
       toast.error(error.message || "Failed to update user");
     } finally {
       setLoading(false);
@@ -264,7 +263,7 @@ const EditUserModal = ({ user, onClose, onSuccess }) => {
                   >
                     <option value="">Select Department</option>
                     {departments.map((dept) => (
-                      <option key={dept.id} value={dept.name}>
+                      <option key={dept.id} value={dept.id}>
                         {dept.name}
                       </option>
                     ))}

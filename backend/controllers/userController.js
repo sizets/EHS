@@ -40,12 +40,30 @@ const userController = {
             const dbInstance = await connectDB();
             const users = await dbInstance.collection('users').find({}).toArray();
 
-            // Remove passwords from response
+            // Get department names for doctors
+            const departmentIds = [...new Set(users.filter(u => u.department).map(u => u.department))];
+            const departments = await dbInstance.collection('departments')
+                .find({ _id: { $in: departmentIds } })
+                .toArray();
+
+            const departmentMap = {};
+            departments.forEach(dept => {
+                departmentMap[dept._id.toString()] = dept.name;
+            });
+
+            // Remove passwords from response and populate department names
             const safeUsers = users.map(user => {
                 const { password, resetToken, resetTokenExpiry, ...safeUser } = user;
                 // Convert _id to id and ensure it's a string
                 safeUser.id = user._id.toString();
                 delete safeUser._id;
+
+                // Add department name for doctors
+                if (user.department) {
+                    safeUser.departmentName = departmentMap[user.department.toString()] || 'Unknown';
+                    safeUser.departmentId = user.department.toString();
+                }
+
                 return safeUser;
             });
 
@@ -155,7 +173,27 @@ const userController = {
             // Add role-specific fields
             if (role.toLowerCase() === 'doctor') {
                 user.specialization = specialization?.trim() || '';
-                user.department = department?.trim() || '';
+
+                // Validate and store department ID
+                if (department) {
+                    const departmentObjectId = safeObjectId(department);
+                    if (!departmentObjectId) {
+                        return res.status(400).json({ error: 'Invalid department ID format' });
+                    }
+
+                    // Verify department exists
+                    const departmentExists = await dbInstance.collection('departments').findOne({
+                        _id: departmentObjectId
+                    });
+
+                    if (!departmentExists) {
+                        return res.status(400).json({ error: 'Department not found' });
+                    }
+
+                    user.department = departmentObjectId;
+                } else {
+                    user.department = null;
+                }
             } else if (role.toLowerCase() === 'patient') {
                 user.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
                 user.emergencyContact = emergencyContact?.trim() || '';
