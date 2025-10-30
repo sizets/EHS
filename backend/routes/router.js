@@ -50,6 +50,9 @@ router.delete('/assignments/:id', authenticate, requireAdmin, assignmentControll
 router.get('/my-assignments', authenticate, assignmentController.getMyAssignments);
 router.put('/my-assignments/:id/status', authenticate, assignmentController.updateMyAssignmentStatus);
 
+// Patient-specific routes
+router.get('/my-assignments-patient', authenticate, assignmentController.getMyAssignmentsPatient);
+
 // Diagnosis Management Routes (Doctor and Admin)
 router.get('/diagnoses', authenticate, diagnosisController.getAllDiagnoses);
 router.get('/diagnoses/assignment/:assignmentId', authenticate, diagnosisController.getDiagnosesByAssignment);

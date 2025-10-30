@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { hmsApi } from "../services/api";
+import ConfirmModal from "../components/ConfirmModal";
 
 const Diagnosis = () => {
   const { assignmentId } = useParams();
@@ -15,6 +16,8 @@ const Diagnosis = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedDiagnosis, setSelectedDiagnosis] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [diagnosisToDelete, setDiagnosisToDelete] = useState(null);
   const [formData, setFormData] = useState({
     diagnosisName: "",
     description: "",
@@ -105,14 +108,18 @@ const Diagnosis = () => {
     }
   };
 
-  const handleDelete = async (diagnosisId) => {
-    if (!window.confirm("Are you sure you want to delete this diagnosis?")) {
-      return;
-    }
+  const handleDelete = (diagnosisId) => {
+    setDiagnosisToDelete(diagnosisId);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!diagnosisToDelete) return;
     try {
-      await hmsApi.deleteDiagnosis(diagnosisId);
+      await hmsApi.deleteDiagnosis(diagnosisToDelete);
       toast.success("Diagnosis deleted successfully");
+      setShowDeleteModal(false);
+      setDiagnosisToDelete(null);
       loadDiagnosisData();
     } catch (err) {
       toast.error(err.message || "Failed to delete diagnosis");
@@ -152,7 +159,11 @@ const Diagnosis = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <button
-            onClick={() => navigate("/assignments")}
+            onClick={() =>
+              navigate(
+                userRole === "patient" ? "/my-assignments" : "/assignments"
+              )
+            }
             className="text-blue-600 hover:text-blue-800 mb-2 flex items-center"
           >
             ← Back to Assignments
@@ -167,7 +178,7 @@ const Diagnosis = () => {
             </p>
           )}
         </div>
-        {assignment?.status === "in_progress" && (
+        {assignment?.status === "in_progress" && userRole !== "patient" && (
           <button
             onClick={() => setShowCreateModal(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
@@ -190,12 +201,14 @@ const Diagnosis = () => {
             <p className="text-lg mb-2">
               No diagnoses found for this assignment
             </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Add the first diagnosis
-            </button>
+            {userRole !== "patient" && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Add the first diagnosis
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -419,6 +432,21 @@ const Diagnosis = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setDiagnosisToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete diagnosis?"
+        message="This action cannot be undone. The diagnosis will be permanently removed."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };
