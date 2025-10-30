@@ -7,15 +7,18 @@ import ConfirmModal from "../components/ConfirmModal";
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
+  const [pendingPatients, setPendingPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [filterRole, setFilterRole] = useState("all");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [showPendingPatients, setShowPendingPatients] = useState(false);
 
   useEffect(() => {
     fetchUsers();
+    fetchPendingPatients();
   }, []);
 
   const fetchUsers = async () => {
@@ -27,6 +30,30 @@ const UserManagement = () => {
       toast.error("Failed to fetch users");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPendingPatients = async () => {
+    try {
+      const response = await hmsApi.getPendingPatients();
+      setPendingPatients(response.patients || []);
+    } catch (error) {
+      console.error("Failed to fetch pending patients:", error);
+    }
+  };
+
+  const handleApprovePatient = async (patientId, status) => {
+    try {
+      await hmsApi.approvePatient(patientId, status);
+      toast.success(
+        `Patient ${
+          status === "approved" ? "approved" : "rejected"
+        } successfully`
+      );
+      fetchUsers();
+      fetchPendingPatients();
+    } catch (error) {
+      toast.error(error.message || "Failed to approve patient");
     }
   };
 
@@ -55,9 +82,17 @@ const UserManagement = () => {
     setUserToDelete(null);
   };
 
-  const filteredUsers = users.filter(
-    (user) => filterRole === "all" || user.role === filterRole
-  );
+  const filteredUsers = users.filter((user) => {
+    // Filter by role
+    const roleMatch = filterRole === "all" || user.role === filterRole;
+
+    // Exclude patients with pending or rejected status
+    const statusMatch =
+      user.role !== "patient" ||
+      !["pending", "rejected"].includes(user.approvalStatus);
+
+    return roleMatch && statusMatch;
+  });
 
   if (loading) {
     return (
@@ -91,14 +126,110 @@ const UserManagement = () => {
               </select>
             </div>
           </div>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Create New User
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowPendingPatients(!showPendingPatients)}
+              className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition-colors flex items-center gap-2"
+            >
+              <span>Pending Patients</span>
+              {pendingPatients.length > 0 && (
+                <span className="bg-white text-orange-600 rounded-full px-2 py-0.5 text-xs font-semibold">
+                  {pendingPatients.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Create New User
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Pending Patients Table */}
+      {showPendingPatients && (
+        <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+          <div className="px-6 py-4 bg-orange-50 border-b border-orange-200">
+            <h3 className="text-lg font-semibold text-orange-900">
+              Pending Patient Approvals
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Registered At
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {pendingPatients.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="4"
+                      className="px-6 py-4 text-center text-gray-500"
+                    >
+                      No pending patients
+                    </td>
+                  </tr>
+                ) : (
+                  pendingPatients.map((patient) => (
+                    <tr key={patient.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {patient.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {patient.email}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {new Date(patient.createdAt).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() =>
+                              handleApprovePatient(patient.id, "approved")
+                            }
+                            className="text-green-600 hover:text-green-900 font-semibold"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleApprovePatient(patient.id, "rejected")
+                            }
+                            className="text-red-600 hover:text-red-900 font-semibold"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Users Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">

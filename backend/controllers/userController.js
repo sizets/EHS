@@ -462,6 +462,73 @@ const userController = {
         }
     },
 
+    // Approve or reject patient registration
+    approvePatient: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+
+            if (!status || !['approved', 'rejected'].includes(status)) {
+                return res.status(400).json({ error: 'Status must be either "approved" or "rejected"' });
+            }
+
+            const dbInstance = await connectDB();
+
+            // Check if user exists and is a patient
+            const user = await dbInstance.collection('users').findOne({
+                _id: safeObjectId(id),
+                role: 'patient'
+            });
+
+            if (!user) {
+                return res.status(404).json({ error: 'Patient not found' });
+            }
+
+            // Update approval status
+            await dbInstance.collection('users').updateOne(
+                { _id: safeObjectId(id) },
+                {
+                    $set: {
+                        approvalStatus: status,
+                        updatedAt: new Date()
+                    }
+                }
+            );
+
+            const statusMessage = status === 'approved' ? 'approved' : 'rejected';
+            res.json({ message: `Patient ${statusMessage} successfully` });
+
+        } catch (error) {
+            console.error('Approve patient error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    // Get all pending patients
+    getPendingPatients: async (req, res) => {
+        try {
+            const dbInstance = await connectDB();
+
+            const patients = await dbInstance.collection('users').find({
+                role: 'patient',
+                approvalStatus: 'pending'
+            }).toArray();
+
+            const safePatients = patients.map(patient => {
+                const { password, resetToken, resetTokenExpiry, ...safePatient } = patient;
+                safePatient.id = patient._id.toString();
+                delete safePatient._id;
+                return safePatient;
+            });
+
+            res.json({ patients: safePatients });
+
+        } catch (error) {
+            console.error('Get pending patients error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
     // Update user profile (for authenticated users to update their own profile)
     updateProfile: async (req, res) => {
         try {
