@@ -10,7 +10,12 @@ const Layout = ({ children }) => {
   const userRole = localStorage.getItem("role");
 
   // Define public routes where sidebar should not be shown
-  const publicRoutes = ["/login", "/forgot-password", "/reset-password"];
+  const publicRoutes = [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+  ];
   const isPublicRoute = publicRoutes.includes(location.pathname);
 
   const handleProfileClick = () => {

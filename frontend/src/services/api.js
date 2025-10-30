@@ -16,11 +16,22 @@ async function request(path, options = {}) {
             }
         });
 
-        const data = await res.json().catch(() => ({}));
+        // Try to parse JSON response
+        let data = {};
+        try {
+            data = await res.json();
+        } catch (parseError) {
+            console.error('Failed to parse JSON response:', parseError);
+            // If parsing fails, check if response is not ok
+            if (!res.ok) {
+                throw new Error(`Request failed with status ${res.status}`);
+            }
+        }
 
         if (!res.ok) {
             // Handle different error response formats
             const errorMessage = data.error || data.message || `Request failed with status ${res.status}`;
+            console.error('API Error Response:', { status: res.status, data });
             throw new Error(errorMessage);
         }
 
@@ -37,6 +48,7 @@ async function request(path, options = {}) {
 export const hmsApi = {
     // Auth
     login: (body) => request('/login', { method: 'POST', body: JSON.stringify(body) }),
+    register: (body) => request('/register', { method: 'POST', body: JSON.stringify(body) }),
     logout: () => request('/logout', { method: 'GET' }),
     getProfile: () => request('/profile'),
     forgotPassword: (body) => request('/forgot-password', { method: 'POST', body: JSON.stringify(body) }),
@@ -67,8 +79,10 @@ export const hmsApi = {
     getAllUsers: () => request('/users'),
     getUsersByRole: (role) => request(`/users/role/${role}`),
     getUserById: (id) => request(`/users/${id}`),
+    getPendingPatients: () => request('/users/pending'),
     createUser: (body) => request('/users', { method: 'POST', body: JSON.stringify(body) }),
     updateUser: (id, body) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    approvePatient: (id, status) => request(`/users/${id}/approve`, { method: 'PUT', body: JSON.stringify({ status }) }),
     deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
 
     // Department Management (Admin only)

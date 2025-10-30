@@ -32,9 +32,9 @@ const AssignmentManagement = () => {
     setShowAssignmentModal(true);
   };
 
-  const handleAssignmentSuccess = (newAssignment) => {
-    setAssignments((prev) => [newAssignment, ...prev]);
+  const handleAssignmentSuccess = async (newAssignment) => {
     setShowAssignmentModal(false);
+    await loadAssignments();
   };
 
   const handleDeleteClick = (assignment) => {

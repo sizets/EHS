@@ -9,6 +9,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 
 // Auth Controller (Public routes)
 router.post('/login', authController.login);
+router.post('/register', authController.registerPatient);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
 router.get('/logout', authenticate, authController.logout);
@@ -19,9 +20,11 @@ router.post('/subscribe', authController.subscribe);
 // User Management Routes (Admin only)
 router.get('/users', authenticate, requireAdmin, userController.getAllUsers);
 router.get('/users/role/:role', authenticate, requireAdmin, userController.getUsersByRole);
+router.get('/users/pending', authenticate, requireAdmin, userController.getPendingPatients);
 router.get('/users/:id', authenticate, requireAdmin, userController.getUserById);
 router.post('/users', authenticate, requireAdmin, userController.createUser);
 router.put('/users/:id', authenticate, requireAdmin, userController.updateUser);
+router.put('/users/:id/approve', authenticate, requireAdmin, userController.approvePatient);
 router.delete('/users/:id', authenticate, requireAdmin, userController.deleteUser);
 
 // Department Management Routes (Admin only)

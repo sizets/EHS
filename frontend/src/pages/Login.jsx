@@ -107,6 +107,9 @@ const Login = () => {
             >
               Forgot your password?
             </Link>
+            <Link to="/register" className="text-blue-600 hover:text-blue-500">
+              Register as Patient
+            </Link>
           </div>
 
           {/* Submit button */}

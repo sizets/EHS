@@ -71,6 +71,19 @@ const authController = {
                 return res.status(401).json({ error: 'Invalid email or password' });
             }
 
+            // Check if patient is approved
+            if (user.role === 'patient' && user.approvalStatus === 'pending') {
+                return res.status(403).json({
+                    error: 'Your account is pending admin approval. Please wait for approval before logging in.'
+                });
+            }
+
+            if (user.role === 'patient' && user.approvalStatus === 'rejected') {
+                return res.status(403).json({
+                    error: 'Your account registration has been rejected. Please contact support for more information.'
+                });
+            }
+
             const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, { expiresIn: '24h' });
 
             return res.status(200).json({
@@ -330,6 +343,77 @@ const authController = {
 
         } catch (error) {
             console.error('Reset Password Error:', error);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    // Public patient registration - requires admin approval
+    registerPatient: async (req, res) => {
+        // Check if req.body exists
+        if (!req.body) {
+            return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
+        }
+
+        const { name, email, password, address, emergencyContact, medicalHistory, allergies } = req.body;
+
+        // Enhanced validation
+        if (!name || !email || !password) {
+            return res.status(400).json({ error: 'Name, email, and password are required' });
+        }
+
+        if (!validateEmail(email.trim())) {
+            return res.status(400).json({ error: 'Please provide a valid email address' });
+        }
+
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
+            return res.status(400).json({ error: passwordValidation.message });
+        }
+
+        if (name.trim().length < 2) {
+            return res.status(400).json({ error: 'Name must be at least 2 characters long' });
+        }
+
+        try {
+            const dbInstance = await connectDB();
+
+            // Check if user already exists
+            const existingUser = await dbInstance.collection('users').findOne({
+                email: email.trim().toLowerCase()
+            });
+
+            if (existingUser) {
+                return res.status(409).json({ error: 'User with this email already exists' });
+            }
+
+            // Hash password
+            const saltRounds = 10;
+            const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+            // Create patient with approval status
+            const patient = {
+                name: name.trim(),
+                email: email.trim().toLowerCase(),
+                password: hashedPassword,
+                role: 'patient',
+                address: address?.trim() || '',
+                emergencyContact: emergencyContact?.trim() || '',
+                medicalHistory: medicalHistory?.trim() || '',
+                allergies: allergies?.trim() || '',
+                approvalStatus: 'pending', // pending, approved, rejected
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+
+            const result = await dbInstance.collection('users').insertOne(patient);
+
+            return res.status(201).json({
+                message: 'Registration successful! Your account is pending admin approval. You will be notified once approved.',
+                userId: result.insertedId.toString()
+            });
+
+        } catch (error) {
+            console.error('Patient Registration Error:', error);
             return res.status(500).json({ error: 'Internal server error' });
         }
     },
