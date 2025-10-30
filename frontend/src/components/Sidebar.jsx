@@ -45,7 +45,15 @@ const Sidebar = () => {
     ...(userRole === "doctor"
       ? [{ name: "My Patients", href: "/my-patients", icon: "patients" }]
       : []),
-    // No patient-specific items for now
+    ...(userRole === "patient"
+      ? [
+          {
+            name: "My Assignments",
+            href: "/my-assignments",
+            icon: "assignments",
+          },
+        ]
+      : []),
     ...(userRole === "admin" || userRole === "doctor"
       ? [
           { name: "Patients", href: "/patients", icon: "patients" },

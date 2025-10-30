@@ -16,6 +16,7 @@ import DoctorManagement from "./pages/DoctorManagement";
 import MyPatients from "./pages/MyPatients";
 import DoctorProfile from "./pages/DoctorProfile";
 import Diagnosis from "./pages/Diagnosis";
+import MyAssignments from "./pages/MyAssignments.jsx";
 
 const App = () => {
   return (
@@ -87,8 +88,17 @@ const App = () => {
         <Route
           path="/diagnosis/:assignmentId"
           element={
-            <ProtectedRoute requiredRole={["doctor", "admin"]}>
+            <ProtectedRoute requiredRole={["doctor", "admin", "patient"]}>
               <Diagnosis />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/my-assignments"
+          element={
+            <ProtectedRoute requiredRole="patient">
+              <MyAssignments />
             </ProtectedRoute>
           }
         />
