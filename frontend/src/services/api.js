@@ -92,6 +92,17 @@ export const hmsApi = {
     getMyAssignments: () => request('/my-assignments'),
     updateMyAssignmentStatus: (id, body) => request(`/my-assignments/${id}/status`, { method: 'PUT', body: JSON.stringify(body) }),
 
+    // Patient-specific assignment methods
+    getMyAssignmentsPatient: () => request('/my-assignments-patient'),
+
+    // Diagnosis Management (Doctor and Admin; patients can view own via assignment)
+    getAllDiagnoses: () => request('/diagnoses'),
+    getDiagnosisById: (id) => request(`/diagnoses/${id}`),
+    getDiagnosesByAssignment: (assignmentId) => request(`/diagnoses/assignment/${assignmentId}`),
+    createDiagnosis: (body) => request('/diagnoses', { method: 'POST', body: JSON.stringify(body) }),
+    updateDiagnosis: (id, body) => request(`/diagnoses/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteDiagnosis: (id) => request(`/diagnoses/${id}`, { method: 'DELETE' }),
+
     // Profile management
     updateProfile: (body) => request('/profile', { method: 'PUT', body: JSON.stringify(body) }),
 };

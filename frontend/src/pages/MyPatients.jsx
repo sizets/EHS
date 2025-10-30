@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { hmsApi } from "../services/api";
 
 const MyPatients = () => {
@@ -227,7 +228,7 @@ const MyPatients = () => {
                       {formatDate(assignment.assignedAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-3 items-center">
                         {assignment.status === "assigned" && (
                           <button
                             onClick={() =>
@@ -259,6 +260,12 @@ const MyPatients = () => {
                             Cancel
                           </button>
                         )}
+                        <Link
+                          to={`/diagnosis/${assignment.id}`}
+                          className="text-blue-600 hover:text-blue-900 font-medium"
+                        >
+                          View Diagnoses
+                        </Link>
                       </div>
                     </td>
                   </tr>

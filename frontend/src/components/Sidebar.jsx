@@ -45,8 +45,21 @@ const Sidebar = () => {
     ...(userRole === "doctor"
       ? [{ name: "My Patients", href: "/my-patients", icon: "patients" }]
       : []),
-    { name: "Patients", href: "/patients", icon: "patients" },
-    { name: "Appointments", href: "/appointments", icon: "appointments" },
+    ...(userRole === "patient"
+      ? [
+          {
+            name: "My Assignments",
+            href: "/my-assignments",
+            icon: "assignments",
+          },
+        ]
+      : []),
+    ...(userRole === "admin" || userRole === "doctor"
+      ? [
+          { name: "Patients", href: "/patients", icon: "patients" },
+          { name: "Appointments", href: "/appointments", icon: "appointments" },
+        ]
+      : []),
   ];
 
   const getIcon = (iconName) => {
