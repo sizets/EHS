@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import DoctorProfile from "../pages/DoctorProfile";
+import PatientProfile from "../pages/PatientProfile";
 
 const Layout = ({ children }) => {
   const location = useLocation();
@@ -19,7 +20,7 @@ const Layout = ({ children }) => {
   const isPublicRoute = publicRoutes.includes(location.pathname);
 
   const handleProfileClick = () => {
-    if (userRole === "doctor") {
+    if (userRole === "doctor" || userRole === "patient") {
       setShowProfileModal(true);
     }
   };
@@ -76,8 +77,8 @@ const Layout = ({ children }) => {
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
 
-      {/* Doctor Profile Icon - Bottom Right */}
-      {userRole === "doctor" && !isPublicRoute && (
+      {/* Profile Icon - Bottom Right (Doctor/Patient) */}
+      {(userRole === "doctor" || userRole === "patient") && !isPublicRoute && (
         <div className="fixed bottom-6 right-6 z-50">
           <button
             onClick={handleProfileClick}
@@ -117,7 +118,7 @@ const Layout = ({ children }) => {
               </button>
             </div>
             <div className="p-6">
-              <DoctorProfile />
+              {userRole === "doctor" ? <DoctorProfile /> : <PatientProfile />}
             </div>
           </div>
         </div>
