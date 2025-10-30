@@ -13,9 +13,18 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   }
 
   // Check if user has required role (if specified)
-  if (requiredRole && userRole !== requiredRole) {
-    // Redirect to unauthorized page or dashboard
-    return <Navigate to="/dashboard" replace />;
+  if (requiredRole) {
+    // Handle array of allowed roles
+    if (Array.isArray(requiredRole)) {
+      if (!requiredRole.includes(userRole)) {
+        return <Navigate to="/dashboard" replace />;
+      }
+    } else {
+      // Handle single role
+      if (userRole !== requiredRole) {
+        return <Navigate to="/dashboard" replace />;
+      }
+    }
   }
 
   return children;

@@ -156,6 +156,7 @@ const assignmentController = {
         }
     },
 
+
     // Get all assignments
     getAllAssignments: async (req, res) => {
         try {
