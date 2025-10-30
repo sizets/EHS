@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { hmsApi } from "../services/api";
 
 const MyPatients = () => {
+  const navigate = useNavigate();
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -227,7 +229,7 @@ const MyPatients = () => {
                       {formatDate(assignment.assignedAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-2 flex-wrap">
                         {assignment.status === "assigned" && (
                           <button
                             onClick={() =>
@@ -239,14 +241,24 @@ const MyPatients = () => {
                           </button>
                         )}
                         {assignment.status === "in_progress" && (
-                          <button
-                            onClick={() =>
-                              handleStatusUpdate(assignment.id, "completed")
-                            }
-                            className="text-green-600 hover:text-green-900 font-medium"
-                          >
-                            Complete
-                          </button>
+                          <>
+                            <button
+                              onClick={() =>
+                                handleStatusUpdate(assignment.id, "completed")
+                              }
+                              className="text-green-600 hover:text-green-900 font-medium"
+                            >
+                              Complete
+                            </button>
+                            <button
+                              onClick={() =>
+                                navigate(`/diagnosis/${assignment.id}`)
+                              }
+                              className="text-blue-600 hover:text-blue-900 font-medium"
+                            >
+                              Add Diagnosis
+                            </button>
+                          </>
                         )}
                         {(assignment.status === "assigned" ||
                           assignment.status === "in_progress") && (
@@ -257,6 +269,16 @@ const MyPatients = () => {
                             className="text-red-600 hover:text-red-900 font-medium"
                           >
                             Cancel
+                          </button>
+                        )}
+                        {assignment.status === "completed" && (
+                          <button
+                            onClick={() =>
+                              navigate(`/diagnosis/${assignment.id}`)
+                            }
+                            className="text-gray-700 hover:text-gray-900 font-medium"
+                          >
+                            View Diagnosis
                           </button>
                         )}
                       </div>

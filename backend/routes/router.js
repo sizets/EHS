@@ -4,6 +4,8 @@ const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
 const departmentController = require('../controllers/departmentController');
 const assignmentController = require('../controllers/assignmentController');
+const diagnosisController = require('../controllers/diagnosisController');
+const testController = require('../controllers/testController');
 const authenticate = require('../middleware/authenticate');
 const requireAdmin = require('../middleware/requireAdmin');
 
@@ -47,6 +49,22 @@ router.delete('/assignments/:id', authenticate, requireAdmin, assignmentControll
 // Doctor-specific routes
 router.get('/my-assignments', authenticate, assignmentController.getMyAssignments);
 router.put('/my-assignments/:id/status', authenticate, assignmentController.updateMyAssignmentStatus);
+
+// Diagnosis Management Routes (Doctor and Admin)
+router.get('/diagnoses', authenticate, diagnosisController.getAllDiagnoses);
+router.get('/diagnoses/assignment/:assignmentId', authenticate, diagnosisController.getDiagnosesByAssignment);
+router.get('/diagnoses/:id', authenticate, diagnosisController.getDiagnosisById);
+router.post('/diagnoses', authenticate, diagnosisController.createDiagnosis);
+router.put('/diagnoses/:id', authenticate, diagnosisController.updateDiagnosis);
+router.delete('/diagnoses/:id', authenticate, diagnosisController.deleteDiagnosis);
+
+// Test Management Routes (Doctor and Admin)
+router.get('/tests', authenticate, testController.getAllTests);
+router.get('/tests/patient/:patientId', authenticate, testController.getTestsByPatient);
+router.get('/tests/:id', authenticate, testController.getTestById);
+router.post('/tests', authenticate, testController.createTest);
+router.put('/tests/:id', authenticate, testController.updateTest);
+router.delete('/tests/:id', authenticate, testController.deleteTest);
 
 // Profile management routes
 router.put('/profile', authenticate, userController.updateProfile);
