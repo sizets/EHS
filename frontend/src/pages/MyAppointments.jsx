@@ -81,6 +81,16 @@ const MyAppointments = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
+  const formatTimeRange = (startTime, endTime) => {
+    if (!startTime) return "N/A";
+    const start = formatTime(startTime);
+    if (endTime) {
+      const end = formatTime(endTime);
+      return `${start} - ${end}`;
+    }
+    return start;
+  };
+
   const formatDateTime = (dateString, timeString) => {
     if (!dateString || !timeString) return "N/A";
     const date = new Date(`${dateString}T${timeString}`);
@@ -171,7 +181,7 @@ const MyAppointments = () => {
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Time
+                  Time Slot
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -206,7 +216,7 @@ const MyAppointments = () => {
                       {formatDate(a.appointmentDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatTime(a.appointmentTime)}
+                      {formatTimeRange(a.startTime || a.appointmentTime, a.endTime)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span

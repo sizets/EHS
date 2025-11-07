@@ -83,6 +83,12 @@ export const hmsApi = {
         if (time) params.append('time', time);
         return request(`/appointments/available-doctors${params.toString() ? `?${params.toString()}` : ''}`);
     },
+    getAvailableTimeSlots: (doctorId, date) => {
+        const params = new URLSearchParams();
+        if (doctorId) params.append('doctorId', doctorId);
+        if (date) params.append('date', date);
+        return request(`/appointments/available-slots${params.toString() ? `?${params.toString()}` : ''}`);
+    },
     // Patient-specific appointment methods
     getMyAppointments: () => request('/my-appointments'),
     // Doctor-specific appointment methods

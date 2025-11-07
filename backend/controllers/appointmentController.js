@@ -30,15 +30,47 @@ const appointmentController = {
                 patientId,
                 doctorId,
                 appointmentDate,
-                appointmentTime,
+                appointmentTime, // Keep for backward compatibility
+                startTime,
+                endTime,
                 symptoms,
                 notes,
                 department
             } = req.body;
 
+            // Use startTime/endTime if provided, otherwise derive from appointmentTime (30 min default)
+            let appointmentStartTime = startTime || appointmentTime;
+            let appointmentEndTime = endTime;
+
+            // If only appointmentTime is provided (backward compatibility), set default 30-minute duration
+            if (appointmentTime && !startTime && !endTime) {
+                appointmentStartTime = appointmentTime;
+                // Calculate end time (30 minutes later)
+                const [hours, minutes] = appointmentTime.split(':').map(Number);
+                const endDate = new Date();
+                endDate.setHours(hours, minutes + 30, 0, 0);
+                appointmentEndTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+            }
+
             // Validation
-            if (!patientId || !doctorId || !appointmentDate || !appointmentTime) {
-                return res.status(400).json({ error: 'Patient ID, Doctor ID, Appointment Date, and Appointment Time are required' });
+            if (!patientId || !doctorId || !appointmentDate || !appointmentStartTime || !appointmentEndTime) {
+                return res.status(400).json({ error: 'Patient ID, Doctor ID, Appointment Date, Start Time, and End Time are required' });
+            }
+
+            // Validate time format
+            const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+            if (!timeRegex.test(appointmentStartTime) || !timeRegex.test(appointmentEndTime)) {
+                return res.status(400).json({ error: 'Invalid time format. Use HH:MM format (24-hour)' });
+            }
+
+            // Validate end time is after start time
+            const [startHours, startMins] = appointmentStartTime.split(':').map(Number);
+            const [endHours, endMins] = appointmentEndTime.split(':').map(Number);
+            const startMinutes = startHours * 60 + startMins;
+            const endMinutes = endHours * 60 + endMins;
+            
+            if (endMinutes <= startMinutes) {
+                return res.status(400).json({ error: 'End time must be after start time' });
             }
 
             // Safely convert IDs to ObjectIds
@@ -50,7 +82,7 @@ const appointmentController = {
             }
 
             // Validate date and time
-            const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
+            const appointmentDateTime = new Date(`${appointmentDate}T${appointmentStartTime}`);
             if (isNaN(appointmentDateTime.getTime())) {
                 return res.status(400).json({ error: 'Invalid appointment date or time format' });
             }
@@ -79,6 +111,26 @@ const appointmentController = {
                 }
             }
 
+            // Check if patient already has an appointment on this date
+            const existingPatientAppointment = await dbInstance.collection('appointments').findOne({
+                patientId: patientObjectId,
+                appointmentDate: appointmentDate,
+                status: { $in: ['scheduled', 'confirmed'] }
+            });
+
+            if (existingPatientAppointment) {
+                return res.status(409).json({
+                    error: 'You already have an appointment scheduled for this date',
+                    existingAppointment: {
+                        id: existingPatientAppointment._id.toString(),
+                        appointmentDate: existingPatientAppointment.appointmentDate,
+                        startTime: existingPatientAppointment.startTime || existingPatientAppointment.appointmentTime,
+                        endTime: existingPatientAppointment.endTime,
+                        doctorId: existingPatientAppointment.doctorId.toString()
+                    }
+                });
+            }
+
             // Verify doctor exists
             const doctor = await dbInstance.collection('users').findOne({
                 _id: doctorObjectId,
@@ -88,23 +140,68 @@ const appointmentController = {
                 return res.status(404).json({ error: 'Doctor not found' });
             }
 
-            // Check if doctor has a conflicting appointment at the same time
-            const conflictingAppointment = await dbInstance.collection('appointments').findOne({
+            // Check doctor's working hours
+            const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            const appointmentDay = new Date(appointmentDate).getDay();
+            const dayName = dayNames[appointmentDay];
+            
+            if (doctor.schedule && doctor.schedule[dayName]) {
+                const daySchedule = doctor.schedule[dayName];
+                if (!daySchedule.available) {
+                    return res.status(400).json({ error: `Doctor is not available on ${dayName}` });
+                }
+                
+                // Check if appointment time is within working hours
+                const scheduleStart = daySchedule.startTime || '09:00';
+                const scheduleEnd = daySchedule.endTime || '17:00';
+                const [scheduleStartHours, scheduleStartMins] = scheduleStart.split(':').map(Number);
+                const [scheduleEndHours, scheduleEndMins] = scheduleEnd.split(':').map(Number);
+                const scheduleStartMinutes = scheduleStartHours * 60 + scheduleStartMins;
+                const scheduleEndMinutes = scheduleEndHours * 60 + scheduleEndMins;
+                
+                if (startMinutes < scheduleStartMinutes || endMinutes > scheduleEndMinutes) {
+                    return res.status(400).json({ 
+                        error: `Appointment time must be within doctor's working hours (${scheduleStart} - ${scheduleEnd})` 
+                    });
+                }
+            }
+
+            // Check for overlapping appointments using time ranges
+            const existingAppointments = await dbInstance.collection('appointments').find({
                 doctorId: doctorObjectId,
                 appointmentDate: appointmentDate,
-                appointmentTime: appointmentTime,
                 status: { $in: ['scheduled', 'confirmed'] }
-            });
+            }).toArray();
 
-            if (conflictingAppointment) {
-                return res.status(409).json({
-                    error: 'Doctor already has an appointment at this time',
-                    conflictingAppointment: {
-                        id: conflictingAppointment._id,
-                        appointmentDate: conflictingAppointment.appointmentDate,
-                        appointmentTime: conflictingAppointment.appointmentTime
-                    }
-                });
+            // Check for time overlaps
+            for (const existing of existingAppointments) {
+                const existingStartTime = existing.startTime || existing.appointmentTime;
+                const existingEndTime = existing.endTime || (() => {
+                    // Calculate default end time if not set (30 min default)
+                    const [hours, minutes] = existingStartTime.split(':').map(Number);
+                    const endDate = new Date();
+                    endDate.setHours(hours, minutes + 30, 0, 0);
+                    return `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+                })();
+
+                const [existingStartHours, existingStartMins] = existingStartTime.split(':').map(Number);
+                const [existingEndHours, existingEndMins] = existingEndTime.split(':').map(Number);
+                const existingStartMinutes = existingStartHours * 60 + existingStartMins;
+                const existingEndMinutes = existingEndHours * 60 + existingEndMins;
+
+                // Check if time ranges overlap
+                // Overlap occurs if: start < existingEnd AND end > existingStart
+                if (startMinutes < existingEndMinutes && endMinutes > existingStartMinutes) {
+                    return res.status(409).json({
+                        error: 'Doctor already has an appointment during this time period',
+                        conflictingAppointment: {
+                            id: existing._id,
+                            appointmentDate: existing.appointmentDate,
+                            startTime: existingStartTime,
+                            endTime: existingEndTime
+                        }
+                    });
+                }
             }
 
             // Handle department - use provided department ID or doctor's department
@@ -135,7 +232,9 @@ const appointmentController = {
                 patientId: patientObjectId,
                 doctorId: doctorObjectId,
                 appointmentDate: appointmentDate,
-                appointmentTime: appointmentTime,
+                appointmentTime: appointmentStartTime, // Keep for backward compatibility
+                startTime: appointmentStartTime,
+                endTime: appointmentEndTime,
                 appointmentDateTime: appointmentDateTime,
                 symptoms: symptoms?.trim() || '',
                 notes: notes?.trim() || '',
@@ -208,7 +307,9 @@ const appointmentController = {
                 patientName: patientMap[appointment.patientId.toString()] || 'Unknown Patient',
                 doctorName: doctorMap[appointment.doctorId.toString()] || 'Unknown Doctor',
                 appointmentDate: appointment.appointmentDate,
-                appointmentTime: appointment.appointmentTime,
+                appointmentTime: appointment.appointmentTime || appointment.startTime, // Backward compatibility
+                startTime: appointment.startTime || appointment.appointmentTime,
+                endTime: appointment.endTime,
                 appointmentDateTime: appointment.appointmentDateTime,
                 symptoms: appointment.symptoms,
                 notes: appointment.notes,
@@ -259,7 +360,9 @@ const appointmentController = {
                     patientName: patient ? patient.name : 'Unknown Patient',
                     doctorName: doctor ? doctor.name : 'Unknown Doctor',
                     appointmentDate: appointment.appointmentDate,
-                    appointmentTime: appointment.appointmentTime,
+                    appointmentTime: appointment.appointmentTime || appointment.startTime, // Backward compatibility
+                    startTime: appointment.startTime || appointment.appointmentTime,
+                    endTime: appointment.endTime,
                     appointmentDateTime: appointment.appointmentDateTime,
                     symptoms: appointment.symptoms,
                     notes: appointment.notes,
@@ -374,7 +477,9 @@ const appointmentController = {
                 doctorId: appointment.doctorId.toString(),
                 doctorName: doctorMap[appointment.doctorId.toString()] || 'Unknown Doctor',
                 appointmentDate: appointment.appointmentDate,
-                appointmentTime: appointment.appointmentTime,
+                appointmentTime: appointment.appointmentTime || appointment.startTime, // Backward compatibility
+                startTime: appointment.startTime || appointment.appointmentTime,
+                endTime: appointment.endTime,
                 appointmentDateTime: appointment.appointmentDateTime,
                 symptoms: appointment.symptoms,
                 notes: appointment.notes,
@@ -435,7 +540,9 @@ const appointmentController = {
                 patientName: patientMap[appointment.patientId.toString()] || 'Unknown Patient',
                 doctorName: doctor ? doctor.name : 'Unknown Doctor',
                 appointmentDate: appointment.appointmentDate,
-                appointmentTime: appointment.appointmentTime,
+                appointmentTime: appointment.appointmentTime || appointment.startTime, // Backward compatibility
+                startTime: appointment.startTime || appointment.appointmentTime,
+                endTime: appointment.endTime,
                 appointmentDateTime: appointment.appointmentDateTime,
                 symptoms: appointment.symptoms,
                 notes: appointment.notes,
@@ -453,16 +560,28 @@ const appointmentController = {
         }
     },
 
-    // Get available doctors for appointments (all doctors, not just emergency)
+    // Get available doctors for appointments (all doctors, excluding emergency)
     getAvailableDoctors: async (req, res) => {
         try {
             const { date, time } = req.query;
             const dbInstance = await connectDB();
 
-            // Get all doctors (not just emergency)
-            const allDoctors = await dbInstance.collection('users').find({
+            // Find the Emergency department ID (if it exists)
+            const emergencyDept = await dbInstance.collection('departments').findOne({
+                name: { $regex: /Emergency/i }
+            });
+
+            // Get all doctors, excluding emergency department doctors
+            const doctorQuery = {
                 role: 'doctor'
-            }).toArray();
+            };
+            
+            // If Emergency department exists, exclude doctors from that department
+            if (emergencyDept) {
+                doctorQuery.department = { $ne: emergencyDept._id };
+            }
+
+            const allDoctors = await dbInstance.collection('users').find(doctorQuery).toArray();
 
             if (allDoctors.length === 0) {
                 return res.json({ doctors: [] });
@@ -626,6 +745,131 @@ const appointmentController = {
         }
     },
 
+    // Get available time slots for a doctor on a specific date
+    getAvailableTimeSlots: async (req, res) => {
+        try {
+            const { doctorId, date } = req.query;
+
+            if (!doctorId || !date) {
+                return res.status(400).json({ error: 'Doctor ID and date are required' });
+            }
+
+            const doctorObjectId = safeObjectId(doctorId);
+            if (!doctorObjectId) {
+                return res.status(400).json({ error: 'Invalid doctor ID format' });
+            }
+
+            const dbInstance = await connectDB();
+
+            // Get doctor information
+            const doctor = await dbInstance.collection('users').findOne({
+                _id: doctorObjectId,
+                role: 'doctor'
+            });
+
+            if (!doctor) {
+                return res.status(404).json({ error: 'Doctor not found' });
+            }
+
+            // Get doctor's schedule for the day
+            const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            const appointmentDay = new Date(date).getDay();
+            const dayName = dayNames[appointmentDay];
+
+            let workingHours = { start: '09:00', end: '17:00', available: true };
+            if (doctor.schedule && doctor.schedule[dayName]) {
+                const daySchedule = doctor.schedule[dayName];
+                if (!daySchedule.available) {
+                    return res.json({ 
+                        available: false, 
+                        message: `Doctor is not available on ${dayName}`,
+                        timeSlots: [] 
+                    });
+                }
+                workingHours = {
+                    start: daySchedule.startTime || '09:00',
+                    end: daySchedule.endTime || '17:00',
+                    available: true
+                };
+            }
+
+            // Get existing appointments for this doctor on this date
+            const existingAppointments = await dbInstance.collection('appointments').find({
+                doctorId: doctorObjectId,
+                appointmentDate: date,
+                status: { $in: ['scheduled', 'confirmed'] }
+            }).toArray();
+
+            // Parse working hours
+            const [workStartHours, workStartMins] = workingHours.start.split(':').map(Number);
+            const [workEndHours, workEndMins] = workingHours.end.split(':').map(Number);
+            const workStartMinutes = workStartHours * 60 + workStartMins;
+            const workEndMinutes = workEndHours * 60 + workEndMins;
+
+            // Generate 30-minute time slots
+            const slotDuration = 30; // minutes
+            const availableSlots = [];
+            let currentMinutes = workStartMinutes;
+
+            while (currentMinutes + slotDuration <= workEndMinutes) {
+                const slotStartHours = Math.floor(currentMinutes / 60);
+                const slotStartMins = currentMinutes % 60;
+                const slotEndMinutes = currentMinutes + slotDuration;
+                const slotEndHours = Math.floor(slotEndMinutes / 60);
+                const slotEndMins = slotEndMinutes % 60;
+
+                const slotStartTime = `${String(slotStartHours).padStart(2, '0')}:${String(slotStartMins).padStart(2, '0')}`;
+                const slotEndTime = `${String(slotEndHours).padStart(2, '0')}:${String(slotEndMins).padStart(2, '0')}`;
+
+                // Check if this slot conflicts with existing appointments
+                let isAvailable = true;
+                for (const existing of existingAppointments) {
+                    const existingStartTime = existing.startTime || existing.appointmentTime;
+                    const existingEndTime = existing.endTime || (() => {
+                        const [hours, minutes] = existingStartTime.split(':').map(Number);
+                        const endDate = new Date();
+                        endDate.setHours(hours, minutes + 30, 0, 0);
+                        return `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+                    })();
+
+                    const [existingStartHours, existingStartMins] = existingStartTime.split(':').map(Number);
+                    const [existingEndHours, existingEndMins] = existingEndTime.split(':').map(Number);
+                    const existingStartMinutes = existingStartHours * 60 + existingStartMins;
+                    const existingEndMinutes = existingEndHours * 60 + existingEndMins;
+
+                    // Check if slot overlaps with existing appointment
+                    if (currentMinutes < existingEndMinutes && (currentMinutes + slotDuration) > existingStartMinutes) {
+                        isAvailable = false;
+                        break;
+                    }
+                }
+
+                if (isAvailable) {
+                    availableSlots.push({
+                        startTime: slotStartTime,
+                        endTime: slotEndTime,
+                        display: `${slotStartTime} - ${slotEndTime}`
+                    });
+                }
+
+                currentMinutes += slotDuration;
+            }
+
+            res.json({
+                available: true,
+                workingHours: {
+                    start: workingHours.start,
+                    end: workingHours.end
+                },
+                timeSlots: availableSlots
+            });
+
+        } catch (error) {
+            console.error('Get available time slots error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
     // Get appointments for the current doctor (doctor-specific)
     getMyAppointmentsDoctor: async (req, res) => {
         try {
@@ -680,7 +924,9 @@ const appointmentController = {
                 patientName: patientMap[appointment.patientId.toString()] || 'Unknown Patient',
                 doctorName: doctor.name, // Current doctor's name
                 appointmentDate: appointment.appointmentDate,
-                appointmentTime: appointment.appointmentTime,
+                appointmentTime: appointment.appointmentTime || appointment.startTime, // Backward compatibility
+                startTime: appointment.startTime || appointment.appointmentTime,
+                endTime: appointment.endTime,
                 appointmentDateTime: appointment.appointmentDateTime,
                 symptoms: appointment.symptoms,
                 notes: appointment.notes,
