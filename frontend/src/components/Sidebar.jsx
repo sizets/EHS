@@ -43,7 +43,14 @@ const Sidebar = () => {
         ]
       : []),
     ...(userRole === "doctor"
-      ? [{ name: "My Patients", href: "/my-patients", icon: "patients" }]
+      ? [
+          { name: "My Patients", href: "/my-patients", icon: "patients" },
+          {
+            name: "My Appointments",
+            href: "/my-appointments-doctor",
+            icon: "appointments",
+          },
+        ]
       : []),
     ...(userRole === "patient"
       ? [
