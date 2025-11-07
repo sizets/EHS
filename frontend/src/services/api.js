@@ -69,11 +69,24 @@ export const hmsApi = {
     updateDoctor: (id, body) => request(`/doctors/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     deleteDoctor: (id) => request(`/doctors/${id}`, { method: 'DELETE' }),
 
-    // Appointments
-    listAppointments: () => request('/appointments'),
+    // Appointment Management
+    getAllAppointments: () => request('/appointments'),
+    getAppointmentById: (id) => request(`/appointments/${id}`),
     createAppointment: (body) => request('/appointments', { method: 'POST', body: JSON.stringify(body) }),
-    updateAppointmentStatus: (id, status) => request(`/appointments/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+    updateAppointmentStatus: (id, body) => request(`/appointments/${id}/status`, { method: 'PUT', body: JSON.stringify(body) }),
     deleteAppointment: (id) => request(`/appointments/${id}`, { method: 'DELETE' }),
+    getAppointmentsByPatient: (patientId) => request(`/appointments/patient/${patientId}`),
+    getAppointmentsByDoctor: (doctorId) => request(`/appointments/doctor/${doctorId}`),
+    getAvailableDoctorsForAppointment: (date, time) => {
+        const params = new URLSearchParams();
+        if (date) params.append('date', date);
+        if (time) params.append('time', time);
+        return request(`/appointments/available-doctors${params.toString() ? `?${params.toString()}` : ''}`);
+    },
+    // Patient-specific appointment methods
+    getMyAppointments: () => request('/my-appointments'),
+    // Doctor-specific appointment methods
+    getMyAppointmentsDoctor: () => request('/my-appointments-doctor'),
 
     // User Management (Admin only)
     getAllUsers: () => request('/users'),

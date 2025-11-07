@@ -4,6 +4,7 @@ const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
 const departmentController = require('../controllers/departmentController');
 const assignmentController = require('../controllers/assignmentController');
+const appointmentController = require('../controllers/appointmentController');
 const diagnosisController = require('../controllers/diagnosisController');
 const testController = require('../controllers/testController');
 const authenticate = require('../middleware/authenticate');
@@ -52,6 +53,22 @@ router.put('/my-assignments/:id/status', authenticate, assignmentController.upda
 
 // Patient-specific routes
 router.get('/my-assignments-patient', authenticate, assignmentController.getMyAssignmentsPatient);
+
+// Appointment Management Routes
+router.get('/appointments', authenticate, requireAdmin, appointmentController.getAllAppointments);
+router.get('/appointments/available-doctors', authenticate, appointmentController.getAvailableDoctors);
+router.get('/appointments/patient/:patientId', authenticate, requireAdmin, appointmentController.getAppointmentsByPatient);
+router.get('/appointments/doctor/:doctorId', authenticate, requireAdmin, appointmentController.getAppointmentsByDoctor);
+router.get('/appointments/:id', authenticate, appointmentController.getAppointmentById);
+router.post('/appointments', authenticate, appointmentController.createAppointment);
+router.put('/appointments/:id/status', authenticate, appointmentController.updateAppointmentStatus);
+router.delete('/appointments/:id', authenticate, appointmentController.deleteAppointment);
+
+// Patient-specific appointment routes
+router.get('/my-appointments', authenticate, appointmentController.getMyAppointments);
+
+// Doctor-specific appointment routes
+router.get('/my-appointments-doctor', authenticate, appointmentController.getMyAppointmentsDoctor);
 
 // Diagnosis Management Routes (Doctor and Admin)
 router.get('/diagnoses', authenticate, diagnosisController.getAllDiagnoses);
