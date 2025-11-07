@@ -119,6 +119,22 @@ export const hmsApi = {
     getMyAssignments: () => request('/my-assignments'),
     updateMyAssignmentStatus: (id, body) => request(`/my-assignments/${id}/status`, { method: 'PUT', body: JSON.stringify(body) }),
 
+    // Diagnosis Management (Doctor and Admin)
+    getAllDiagnoses: () => request('/diagnoses'),
+    getDiagnosisById: (id) => request(`/diagnoses/${id}`),
+    getDiagnosesByAssignment: (assignmentId) => request(`/diagnoses/assignment/${assignmentId}`),
+    createDiagnosis: (body) => request('/diagnoses', { method: 'POST', body: JSON.stringify(body) }),
+    updateDiagnosis: (id, body) => request(`/diagnoses/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteDiagnosis: (id) => request(`/diagnoses/${id}`, { method: 'DELETE' }),
+
+    // Test Management (Doctor and Admin)
+    getAllTests: () => request('/tests'),
+    getTestById: (id) => request(`/tests/${id}`),
+    getTestsByPatient: (patientId) => request(`/tests/patient/${patientId}`),
+    createTest: (body) => request('/tests', { method: 'POST', body: JSON.stringify(body) }),
+    updateTest: (id, body) => request(`/tests/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteTest: (id) => request(`/tests/${id}`, { method: 'DELETE' }),
+
     // Profile management
     updateProfile: (body) => request('/profile', { method: 'PUT', body: JSON.stringify(body) }),
 };

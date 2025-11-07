@@ -156,6 +156,7 @@ const assignmentController = {
         }
     },
 
+
     // Get all assignments
     getAllAssignments: async (req, res) => {
         try {
@@ -593,6 +594,76 @@ const assignmentController = {
             res.json({ assignments: formattedAssignments });
         } catch (error) {
             console.error('Get my assignments error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    // Get assignments for the current patient (patient-specific)
+    getMyAssignmentsPatient: async (req, res) => {
+        try {
+            const patientId = req.user.id; // Get patient ID from authenticated user
+
+            const patientObjectId = safeObjectId(patientId);
+            if (!patientObjectId) {
+                return res.status(400).json({ error: 'Invalid patient ID format' });
+            }
+
+            const dbInstance = await connectDB();
+
+            // Verify the user is a patient
+            const patient = await dbInstance.collection('users').findOne({
+                _id: patientObjectId,
+                role: 'patient'
+            });
+            if (!patient) {
+                return res.status(403).json({ error: 'Access denied. Only patients can view their assignments.' });
+            }
+
+            const assignments = await dbInstance.collection('assignments')
+                .find({ patientId: patientObjectId })
+                .sort({ assignedAt: -1 })
+                .toArray();
+
+            // Collect referenced doctor and department IDs
+            const doctorIds = [...new Set(assignments.map(a => a.doctorId))];
+            const departmentIds = [...new Set(assignments.map(a => a.department).filter(Boolean))];
+
+            const [doctors, departments] = await Promise.all([
+                dbInstance.collection('users').find({ _id: { $in: doctorIds } }).toArray(),
+                dbInstance.collection('departments').find({ _id: { $in: departmentIds } }).toArray()
+            ]);
+
+            const doctorMap = {};
+            doctors.forEach(doctor => {
+                doctorMap[doctor._id.toString()] = doctor.name;
+            });
+
+            const departmentMap = {};
+            departments.forEach(dept => {
+                departmentMap[dept._id.toString()] = dept.name;
+            });
+
+            const formattedAssignments = assignments.map(assignment => ({
+                id: assignment._id.toString(),
+                patientId: assignment.patientId.toString(),
+                doctorId: assignment.doctorId.toString(),
+                doctorName: doctorMap[assignment.doctorId.toString()] || 'Unknown Doctor',
+                department: assignment.department ? (departmentMap[assignment.department.toString()] || 'Unknown') : 'Not assigned',
+                departmentId: assignment.department ? assignment.department.toString() : null,
+                status: assignment.status,
+                assignmentType: assignment.assignmentType,
+                priority: assignment.priority,
+                symptoms: assignment.symptoms,
+                notes: assignment.notes,
+                assignedBy: assignment.assignedBy,
+                assignedAt: assignment.assignedAt,
+                createdAt: assignment.createdAt,
+                updatedAt: assignment.updatedAt
+            }));
+
+            res.json({ assignments: formattedAssignments });
+        } catch (error) {
+            console.error('Get my assignments (patient) error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     },
