@@ -71,11 +71,8 @@ const Sidebar = () => {
           },
         ]
       : []),
-    ...(userRole === "admin" || userRole === "doctor"
-      ? [
-          { name: "Patients", href: "/patients", icon: "patients" },
-          { name: "Appointments", href: "/appointments", icon: "appointments" },
-        ]
+    ...(userRole === "admin"
+      ? [{ name: "Appointments", href: "/appointments", icon: "appointments" }]
       : []),
   ];
 

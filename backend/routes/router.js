@@ -57,6 +57,7 @@ router.get('/my-assignments-patient', authenticate, assignmentController.getMyAs
 // Appointment Management Routes
 router.get('/appointments', authenticate, requireAdmin, appointmentController.getAllAppointments);
 router.get('/appointments/available-doctors', authenticate, appointmentController.getAvailableDoctors);
+router.get('/appointments/available-slots', authenticate, appointmentController.getAvailableTimeSlots);
 router.get('/appointments/patient/:patientId', authenticate, requireAdmin, appointmentController.getAppointmentsByPatient);
 router.get('/appointments/doctor/:doctorId', authenticate, requireAdmin, appointmentController.getAppointmentsByDoctor);
 router.get('/appointments/:id', authenticate, appointmentController.getAppointmentById);

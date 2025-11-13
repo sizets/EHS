@@ -29,15 +29,21 @@ const MyAppointmentsDoctor = () => {
   };
 
   const handleUpdateStatus = async (appointmentId, newStatus) => {
-    if (!window.confirm(`Are you sure you want to mark this appointment as ${newStatus}?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to mark this appointment as ${newStatus}?`
+      )
+    ) {
       return;
     }
 
     try {
       setUpdatingStatus(appointmentId);
-      await hmsApi.updateAppointmentStatus(appointmentId, { status: newStatus });
+      await hmsApi.updateAppointmentStatus(appointmentId, {
+        status: newStatus,
+      });
       toast.success(`Appointment ${newStatus} successfully`);
-      
+
       // If completing an appointment, redirect to diagnosis page
       if (newStatus === "completed") {
         navigate(`/diagnosis/appointment/${appointmentId}`);
@@ -195,7 +201,10 @@ const MyAppointmentsDoctor = () => {
                       {formatDate(a.appointmentDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatTimeRange(a.startTime || a.appointmentTime, a.endTime)}
+                      {formatTimeRange(
+                        a.startTime || a.appointmentTime,
+                        a.endTime
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 max-w-xs truncate">
@@ -216,14 +225,20 @@ const MyAppointmentsDoctor = () => {
                         {a.status === "scheduled" && (
                           <>
                             <button
-                              onClick={() => handleUpdateStatus(a.id, "confirmed")}
+                              onClick={() =>
+                                handleUpdateStatus(a.id, "confirmed")
+                              }
                               disabled={updatingStatus === a.id}
                               className="text-green-600 hover:text-green-900 disabled:opacity-50"
                             >
-                              {updatingStatus === a.id ? "Updating..." : "Confirm"}
+                              {updatingStatus === a.id
+                                ? "Updating..."
+                                : "Confirm"}
                             </button>
                             <button
-                              onClick={() => handleUpdateStatus(a.id, "cancelled")}
+                              onClick={() =>
+                                handleUpdateStatus(a.id, "cancelled")
+                              }
                               disabled={updatingStatus === a.id}
                               className="text-red-600 hover:text-red-900 disabled:opacity-50"
                             >
@@ -234,14 +249,20 @@ const MyAppointmentsDoctor = () => {
                         {a.status === "confirmed" && (
                           <>
                             <button
-                              onClick={() => handleUpdateStatus(a.id, "completed")}
+                              onClick={() =>
+                                handleUpdateStatus(a.id, "completed")
+                              }
                               disabled={updatingStatus === a.id}
                               className="text-blue-600 hover:text-blue-900 disabled:opacity-50"
                             >
-                              {updatingStatus === a.id ? "Updating..." : "Complete"}
+                              {updatingStatus === a.id
+                                ? "Updating..."
+                                : "Complete"}
                             </button>
                             <button
-                              onClick={() => handleUpdateStatus(a.id, "cancelled")}
+                              onClick={() =>
+                                handleUpdateStatus(a.id, "cancelled")
+                              }
                               disabled={updatingStatus === a.id}
                               className="text-red-600 hover:text-red-900 disabled:opacity-50"
                             >
@@ -251,7 +272,9 @@ const MyAppointmentsDoctor = () => {
                         )}
                         {a.status === "completed" && (
                           <button
-                            onClick={() => navigate(`/diagnosis/appointment/${a.id}`)}
+                            onClick={() =>
+                              navigate(`/diagnosis/appointment/${a.id}`)
+                            }
                             className="text-blue-600 hover:text-blue-900"
                             title="View Diagnosis"
                           >
@@ -275,4 +298,3 @@ const MyAppointmentsDoctor = () => {
 };
 
 export default MyAppointmentsDoctor;
-

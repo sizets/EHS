@@ -19,6 +19,8 @@ import Diagnosis from "./pages/Diagnosis";
 import MyAssignments from "./pages/MyAssignments.jsx";
 import MyAssignmentsDoctor from "./pages/MyAssignmentsDoctor.jsx";
 import MyAppointments from "./pages/MyAppointments.jsx";
+import MyAppointmentsDoctor from "./pages/MyAppointmentsDoctor.jsx";
+import AppointmentManagement from "./pages/AppointmentManagement.jsx";
 
 const App = () => {
   return (
@@ -68,6 +70,14 @@ const App = () => {
           element={
             <ProtectedRoute requiredRole="admin">
               <DoctorManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/appointments"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AppointmentManagement />
             </ProtectedRoute>
           }
         />

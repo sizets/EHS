@@ -32,13 +32,19 @@ const AppointmentManagement = () => {
   };
 
   const handleUpdateStatus = async (appointmentId, newStatus) => {
-    if (!window.confirm(`Are you sure you want to mark this appointment as ${newStatus}?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to mark this appointment as ${newStatus}?`
+      )
+    ) {
       return;
     }
 
     try {
       setUpdatingStatus(appointmentId);
-      await hmsApi.updateAppointmentStatus(appointmentId, { status: newStatus });
+      await hmsApi.updateAppointmentStatus(appointmentId, {
+        status: newStatus,
+      });
       toast.success(`Appointment ${newStatus} successfully`);
       await loadAppointments();
     } catch (err) {
@@ -123,7 +129,9 @@ const AppointmentManagement = () => {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Appointment Management</h1>
+        <h1 className="text-3xl font-bold text-gray-800">
+          Appointment Management
+        </h1>
         <div className="flex items-center space-x-4">
           <div className="text-sm text-gray-600">
             Total: {appointments.length}
@@ -221,7 +229,10 @@ const AppointmentManagement = () => {
                       {formatDate(a.appointmentDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatTimeRange(a.startTime || a.appointmentTime, a.endTime)}
+                      {formatTimeRange(
+                        a.startTime || a.appointmentTime,
+                        a.endTime
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 max-w-xs truncate">
@@ -242,7 +253,9 @@ const AppointmentManagement = () => {
                         {a.status === "scheduled" && (
                           <>
                             <button
-                              onClick={() => handleUpdateStatus(a.id, "confirmed")}
+                              onClick={() =>
+                                handleUpdateStatus(a.id, "confirmed")
+                              }
                               disabled={updatingStatus === a.id}
                               className="text-green-600 hover:text-green-900 disabled:opacity-50"
                               title="Confirm"
@@ -250,7 +263,9 @@ const AppointmentManagement = () => {
                               Confirm
                             </button>
                             <button
-                              onClick={() => handleUpdateStatus(a.id, "cancelled")}
+                              onClick={() =>
+                                handleUpdateStatus(a.id, "cancelled")
+                              }
                               disabled={updatingStatus === a.id}
                               className="text-red-600 hover:text-red-900 disabled:opacity-50"
                               title="Cancel"
@@ -262,7 +277,9 @@ const AppointmentManagement = () => {
                         {a.status === "confirmed" && (
                           <>
                             <button
-                              onClick={() => handleUpdateStatus(a.id, "completed")}
+                              onClick={() =>
+                                handleUpdateStatus(a.id, "completed")
+                              }
                               disabled={updatingStatus === a.id}
                               className="text-blue-600 hover:text-blue-900 disabled:opacity-50"
                               title="Complete"
@@ -270,14 +287,18 @@ const AppointmentManagement = () => {
                               Complete
                             </button>
                             <button
-                              onClick={() => navigate(`/diagnosis/appointment/${a.id}`)}
+                              onClick={() =>
+                                navigate(`/diagnosis/appointment/${a.id}`)
+                              }
                               className="text-green-600 hover:text-green-900"
                               title="Add Diagnosis"
                             >
                               Add Diagnosis
                             </button>
                             <button
-                              onClick={() => handleUpdateStatus(a.id, "cancelled")}
+                              onClick={() =>
+                                handleUpdateStatus(a.id, "cancelled")
+                              }
                               disabled={updatingStatus === a.id}
                               className="text-red-600 hover:text-red-900 disabled:opacity-50"
                               title="Cancel"
@@ -288,7 +309,9 @@ const AppointmentManagement = () => {
                         )}
                         {a.status === "completed" && (
                           <button
-                            onClick={() => navigate(`/diagnosis/appointment/${a.id}`)}
+                            onClick={() =>
+                              navigate(`/diagnosis/appointment/${a.id}`)
+                            }
                             className="text-gray-700 hover:text-gray-900"
                             title="View Diagnosis"
                           >
@@ -331,4 +354,3 @@ const AppointmentManagement = () => {
 };
 
 export default AppointmentManagement;
-

@@ -6,7 +6,8 @@ const CreateAppointmentModal = ({ onClose, onSuccess, currentPatientId }) => {
     patientId: currentPatientId || "",
     doctorId: "",
     appointmentDate: "",
-    appointmentTime: "",
+    startTime: "",
+    endTime: "",
     symptoms: "",
     notes: "",
     department: "",
@@ -14,8 +15,10 @@ const CreateAppointmentModal = ({ onClose, onSuccess, currentPatientId }) => {
 
   const [doctors, setDoctors] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [timeSlots, setTimeSlots] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -24,15 +27,24 @@ const CreateAppointmentModal = ({ onClose, onSuccess, currentPatientId }) => {
     loadInitialData();
   }, []);
 
-  // Load available doctors when date/time changes
+  // Load available doctors when date changes
   useEffect(() => {
-    if (formData.appointmentDate && formData.appointmentTime) {
-      loadAvailableDoctors();
-    } else {
-      // Load all doctors if no date/time selected
+    if (formData.appointmentDate) {
       loadInitialDoctors();
+    } else {
+      setDoctors([]);
     }
-  }, [formData.appointmentDate, formData.appointmentTime]);
+  }, [formData.appointmentDate]);
+
+  // Load time slots when doctor and date are selected
+  useEffect(() => {
+    if (formData.appointmentDate && formData.doctorId) {
+      loadTimeSlots();
+    } else {
+      setTimeSlots([]);
+      setFormData((prev) => ({ ...prev, startTime: "", endTime: "" }));
+    }
+  }, [formData.appointmentDate, formData.doctorId]);
 
   const loadInitialData = async () => {
     try {
@@ -60,29 +72,36 @@ const CreateAppointmentModal = ({ onClose, onSuccess, currentPatientId }) => {
     }
   };
 
-  const loadAvailableDoctors = async () => {
+  const loadTimeSlots = async () => {
     try {
-      setLoadingDoctors(true);
-      const doctorsRes = await hmsApi.getAvailableDoctorsForAppointment(
-        formData.appointmentDate,
-        formData.appointmentTime
+      setLoadingSlots(true);
+      const slotsRes = await hmsApi.getAvailableTimeSlots(
+        formData.doctorId,
+        formData.appointmentDate
       );
-      setDoctors(doctorsRes.doctors || []);
       
-      // Clear doctor selection if selected doctor is no longer available
-      if (formData.doctorId) {
-        const isStillAvailable = doctorsRes.doctors?.some(
-          (d) => d.id === formData.doctorId
+      if (slotsRes.available) {
+        setTimeSlots(slotsRes.timeSlots || []);
+      } else {
+        setTimeSlots([]);
+        setError(slotsRes.message || "Doctor is not available on this date");
+      }
+      
+      // Clear time selection if selected slot is no longer available
+      if (formData.startTime) {
+        const isStillAvailable = slotsRes.timeSlots?.some(
+          (slot) => slot.startTime === formData.startTime
         );
         if (!isStillAvailable) {
-          setFormData((prev) => ({ ...prev, doctorId: "", department: "" }));
+          setFormData((prev) => ({ ...prev, startTime: "", endTime: "" }));
         }
       }
     } catch (err) {
-      console.error("Failed to load available doctors:", err);
-      setDoctors([]);
+      console.error("Failed to load time slots:", err);
+      setTimeSlots([]);
+      setError("Failed to load available time slots: " + err.message);
     } finally {
-      setLoadingDoctors(false);
+      setLoadingSlots(false);
     }
   };
 
@@ -104,6 +123,17 @@ const CreateAppointmentModal = ({ onClose, onSuccess, currentPatientId }) => {
       }
     }
 
+    // Auto-set end time when start time is selected
+    if (name === "startTime") {
+      const selectedSlot = timeSlots.find((slot) => slot.startTime === value);
+      if (selectedSlot) {
+        setFormData((prev) => ({
+          ...prev,
+          endTime: selectedSlot.endTime,
+        }));
+      }
+    }
+
     // Clear error when user starts typing
     if (error) setError("");
   };
@@ -116,18 +146,25 @@ const CreateAppointmentModal = ({ onClose, onSuccess, currentPatientId }) => {
 
     try {
       // Validate form
-      if (!formData.patientId || !formData.doctorId || !formData.appointmentDate || !formData.appointmentTime) {
+      if (!formData.patientId || !formData.doctorId || !formData.appointmentDate || !formData.startTime || !formData.endTime) {
         throw new Error("Please fill in all required fields");
       }
 
       // Validate date is not in the past
-      const appointmentDateTime = new Date(`${formData.appointmentDate}T${formData.appointmentTime}`);
+      const appointmentDateTime = new Date(`${formData.appointmentDate}T${formData.startTime}`);
       if (appointmentDateTime < new Date()) {
         throw new Error("Cannot book appointments in the past");
       }
 
       const appointmentData = {
-        ...formData,
+        patientId: formData.patientId,
+        doctorId: formData.doctorId,
+        appointmentDate: formData.appointmentDate,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        symptoms: formData.symptoms,
+        notes: formData.notes,
+        department: formData.department,
       };
 
       const result = await hmsApi.createAppointment(appointmentData);
@@ -199,24 +236,6 @@ const CreateAppointmentModal = ({ onClose, onSuccess, currentPatientId }) => {
               />
             </div>
 
-            {/* Appointment Time */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Appointment Time *
-              </label>
-              <input
-                type="time"
-                name="appointmentTime"
-                value={formData.appointmentTime}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Select date and time to see available doctors
-              </p>
-            </div>
-
             {/* Doctor Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -233,16 +252,16 @@ const CreateAppointmentModal = ({ onClose, onSuccess, currentPatientId }) => {
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
-                  disabled={!formData.appointmentDate || !formData.appointmentTime}
+                  disabled={!formData.appointmentDate}
                 >
                   <option value="">
-                    {!formData.appointmentDate || !formData.appointmentTime
-                      ? "Please select date and time first"
+                    {!formData.appointmentDate
+                      ? "Please select date first"
                       : "Choose a doctor..."}
                   </option>
                   {doctors.length === 0 ? (
                     <option value="" disabled>
-                      No available doctors at this time
+                      No available doctors
                     </option>
                   ) : (
                     doctors.map((doctor) => (
@@ -269,6 +288,54 @@ const CreateAppointmentModal = ({ onClose, onSuccess, currentPatientId }) => {
                 </div>
               )}
             </div>
+
+            {/* Available Time Slots */}
+            {formData.appointmentDate && formData.doctorId && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Time Slot *
+                </label>
+                {loadingSlots ? (
+                  <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                    <span className="text-gray-500">Loading available time slots...</span>
+                  </div>
+                ) : timeSlots.length === 0 ? (
+                  <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-yellow-50">
+                    <span className="text-yellow-700">
+                      No available time slots for this doctor on this date
+                    </span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 border border-gray-300 rounded-md">
+                    {timeSlots.map((slot) => (
+                      <button
+                        key={slot.startTime}
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            startTime: slot.startTime,
+                            endTime: slot.endTime,
+                          }));
+                        }}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                          formData.startTime === slot.startTime
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-blue-50 hover:border-blue-300"
+                        }`}
+                      >
+                        {slot.display}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {formData.startTime && formData.endTime && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    Selected: {formData.startTime} - {formData.endTime}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Department - Hidden field with department ID */}
             <input
@@ -319,9 +386,9 @@ const CreateAppointmentModal = ({ onClose, onSuccess, currentPatientId }) => {
               </button>
               <button
                 type="submit"
-                disabled={loading || loadingDoctors}
+                disabled={loading || loadingDoctors || loadingSlots || !formData.startTime}
                 className={`px-6 py-2 rounded-md font-medium transition-colors bg-blue-600 hover:bg-blue-700 text-white ${
-                  loading || loadingDoctors
+                  loading || loadingDoctors || loadingSlots || !formData.startTime
                     ? "opacity-50 cursor-not-allowed"
                     : ""
                 }`}
