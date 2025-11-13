@@ -1,64 +1,71 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { hmsApi } from "../services/api";
-import CreateAppointmentModal from "../components/CreateAppointmentModal";
+import { toast } from "react-toastify";
+import ConfirmModal from "../components/ConfirmModal";
 
-const MyAppointments = () => {
+const AppointmentManagement = () => {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  const [currentPatientId, setCurrentPatientId] = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [appointmentToDelete, setAppointmentToDelete] = useState(null);
 
   useEffect(() => {
-    loadPatientInfo();
     loadAppointments();
   }, []);
-
-  const loadPatientInfo = async () => {
-    try {
-      const profile = await hmsApi.getProfile();
-      if (profile.user && profile.user.role === "patient") {
-        setCurrentPatientId(profile.user.id);
-      }
-    } catch (err) {
-      console.error("Failed to load patient info:", err);
-    }
-  };
 
   const loadAppointments = async () => {
     try {
       setLoading(true);
-      const resp = await hmsApi.getMyAppointments();
-      setAppointments(resp.appointments || []);
+      const response = await hmsApi.getAllAppointments();
+      setAppointments(response.appointments || []);
     } catch (err) {
-      setError("Failed to load your appointments: " + err.message);
+      setError("Failed to load appointments: " + err.message);
+      toast.error("Failed to load appointments");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateAppointment = () => {
-    setShowAppointmentModal(true);
-  };
-
-  const handleAppointmentSuccess = async (newAppointment) => {
-    setShowAppointmentModal(false);
-    await loadAppointments();
-  };
-
-  const handleCancelAppointment = async (appointmentId) => {
-    if (!window.confirm("Are you sure you want to cancel this appointment?")) {
+  const handleUpdateStatus = async (appointmentId, newStatus) => {
+    if (!window.confirm(`Are you sure you want to mark this appointment as ${newStatus}?`)) {
       return;
     }
 
     try {
-      await hmsApi.updateAppointmentStatus(appointmentId, { status: "cancelled" });
+      setUpdatingStatus(appointmentId);
+      await hmsApi.updateAppointmentStatus(appointmentId, { status: newStatus });
+      toast.success(`Appointment ${newStatus} successfully`);
       await loadAppointments();
     } catch (err) {
-      setError("Failed to cancel appointment: " + err.message);
+      toast.error("Failed to update appointment status: " + err.message);
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  const handleDeleteClick = (appointment) => {
+    setAppointmentToDelete(appointment);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!appointmentToDelete) return;
+
+    try {
+      await hmsApi.deleteAppointment(appointmentToDelete.id);
+      toast.success("Appointment deleted successfully");
+      setAppointments((prev) =>
+        prev.filter((a) => a.id !== appointmentToDelete.id)
+      );
+      setShowDeleteModal(false);
+      setAppointmentToDelete(null);
+    } catch (err) {
+      toast.error("Failed to delete appointment: " + err.message);
     }
   };
 
@@ -73,7 +80,6 @@ const MyAppointments = () => {
 
   const formatTime = (timeString) => {
     if (!timeString) return "N/A";
-    // Format time string (HH:MM) to readable format
     const [hours, minutes] = timeString.split(":");
     const hour = parseInt(hours);
     const ampm = hour >= 12 ? "PM" : "AM";
@@ -81,10 +87,14 @@ const MyAppointments = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const formatDateTime = (dateString, timeString) => {
-    if (!dateString || !timeString) return "N/A";
-    const date = new Date(`${dateString}T${timeString}`);
-    return date.toLocaleString();
+  const formatTimeRange = (startTime, endTime) => {
+    if (!startTime) return "N/A";
+    const start = formatTime(startTime);
+    if (endTime) {
+      const end = formatTime(endTime);
+      return `${start} - ${end}`;
+    }
+    return start;
   };
 
   const getStatusColor = (status) => {
@@ -113,17 +123,11 @@ const MyAppointments = () => {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">My Appointments</h1>
+        <h1 className="text-3xl font-bold text-gray-800">Appointment Management</h1>
         <div className="flex items-center space-x-4">
           <div className="text-sm text-gray-600">
             Total: {appointments.length}
           </div>
-          <button
-            onClick={handleCreateAppointment}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Book New Appointment
-          </button>
         </div>
       </div>
 
@@ -162,6 +166,9 @@ const MyAppointments = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Patient
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Doctor
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -171,7 +178,10 @@ const MyAppointments = () => {
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Time
+                  Time Slot
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Symptoms
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -185,7 +195,7 @@ const MyAppointments = () => {
               {filteredAppointments.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="8"
                     className="px-6 py-4 text-center text-gray-500"
                   >
                     No appointments found
@@ -196,7 +206,12 @@ const MyAppointments = () => {
                   <tr key={a.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {a.doctorName || "Doctor"}
+                        {a.patientName || "Unknown Patient"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {a.doctorName || "Unknown Doctor"}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -206,7 +221,12 @@ const MyAppointments = () => {
                       {formatDate(a.appointmentDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatTime(a.appointmentTime)}
+                      {formatTimeRange(a.startTime || a.appointmentTime, a.endTime)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 max-w-xs truncate">
+                        {a.symptoms || "No symptoms"}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -219,22 +239,69 @@ const MyAppointments = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        {a.status === "scheduled" || a.status === "confirmed" ? (
-                          <button
-                            onClick={() => handleCancelAppointment(a.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Cancel
-                          </button>
-                        ) : null}
+                        {a.status === "scheduled" && (
+                          <>
+                            <button
+                              onClick={() => handleUpdateStatus(a.id, "confirmed")}
+                              disabled={updatingStatus === a.id}
+                              className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                              title="Confirm"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => handleUpdateStatus(a.id, "cancelled")}
+                              disabled={updatingStatus === a.id}
+                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                              title="Cancel"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
+                        {a.status === "confirmed" && (
+                          <>
+                            <button
+                              onClick={() => handleUpdateStatus(a.id, "completed")}
+                              disabled={updatingStatus === a.id}
+                              className="text-blue-600 hover:text-blue-900 disabled:opacity-50"
+                              title="Complete"
+                            >
+                              Complete
+                            </button>
+                            <button
+                              onClick={() => navigate(`/diagnosis/appointment/${a.id}`)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Add Diagnosis"
+                            >
+                              Add Diagnosis
+                            </button>
+                            <button
+                              onClick={() => handleUpdateStatus(a.id, "cancelled")}
+                              disabled={updatingStatus === a.id}
+                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                              title="Cancel"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
                         {a.status === "completed" && (
                           <button
                             onClick={() => navigate(`/diagnosis/appointment/${a.id}`)}
-                            className="text-blue-600 hover:text-blue-900"
+                            className="text-gray-700 hover:text-gray-900"
+                            title="View Diagnosis"
                           >
-                            View Details
+                            View Diagnosis
                           </button>
                         )}
+                        <button
+                          onClick={() => handleDeleteClick(a)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -245,17 +312,23 @@ const MyAppointments = () => {
         </div>
       </div>
 
-      {/* Create Appointment Modal */}
-      {showAppointmentModal && (
-        <CreateAppointmentModal
-          onClose={() => setShowAppointmentModal(false)}
-          onSuccess={handleAppointmentSuccess}
-          currentPatientId={currentPatientId}
-        />
-      )}
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setAppointmentToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Appointment?"
+        message="This action cannot be undone. The appointment will be permanently removed."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };
 
-export default MyAppointments;
+export default AppointmentManagement;
 

@@ -73,6 +73,7 @@ router.get('/my-appointments-doctor', authenticate, appointmentController.getMyA
 // Diagnosis Management Routes (Doctor and Admin)
 router.get('/diagnoses', authenticate, diagnosisController.getAllDiagnoses);
 router.get('/diagnoses/assignment/:assignmentId', authenticate, diagnosisController.getDiagnosesByAssignment);
+router.get('/diagnoses/appointment/:appointmentId', authenticate, diagnosisController.getDiagnosesByAppointment);
 router.get('/diagnoses/:id', authenticate, diagnosisController.getDiagnosisById);
 router.post('/diagnoses', authenticate, diagnosisController.createDiagnosis);
 router.put('/diagnoses/:id', authenticate, diagnosisController.updateDiagnosis);

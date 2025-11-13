@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { hmsApi, API_BASE } from "../services/api";
+import { hmsApi } from "../services/api";
 
 const MyAssignments = () => {
   const navigate = useNavigate();
@@ -16,27 +16,8 @@ const MyAssignments = () => {
   const loadAssignments = async () => {
     try {
       setLoading(true);
-      if (typeof hmsApi.getMyAssignmentsPatient === "function") {
-        const resp = await hmsApi.getMyAssignmentsPatient();
-        setAssignments(resp.assignments || []);
-      } else {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${API_BASE}/my-assignments-patient`, {
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        const data = await res.json().catch(() => ({ assignments: [] }));
-        if (!res.ok) {
-          throw new Error(
-            data.error ||
-              data.message ||
-              `Request failed with status ${res.status}`
-          );
-        }
-        setAssignments(data.assignments || []);
-      }
+      const resp = await hmsApi.getMyAssignmentsPatient();
+      setAssignments(resp.assignments || []);
     } catch (err) {
       setError("Failed to load your assignments: " + err.message);
     } finally {
@@ -48,7 +29,30 @@ const MyAssignments = () => {
     return filterStatus === "all" || a.status === filterStatus;
   });
 
-  const formatDate = (d) => new Date(d).toLocaleString();
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleString();
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "assigned":
+        return "bg-blue-100 text-blue-800";
+      case "in_progress":
+        return "bg-yellow-100 text-yellow-800";
+      case "completed":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
 
   if (loading) {
     return (
@@ -138,16 +142,20 @@ const MyAssignments = () => {
                       {a.department || "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                          a.status
+                        )}`}
+                      >
                         {a.status?.replace("_", " ")?.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(a.assignedAt)}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDateTime(a.assignedAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
-                        onClick={() => navigate(`/diagnosis/${a.id}`)}
+                        onClick={() => navigate(`/diagnosis/assignment/${a.id}`)}
                         className="text-blue-600 hover:text-blue-900"
                       >
                         {a.status === "completed"

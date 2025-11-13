@@ -26,17 +26,15 @@ const diagnosisController = {
                 return res.status(400).json({ error: 'Request body is missing. Please ensure Content-Type is application/json' });
             }
 
-            const { assignmentId, diagnosisName, description } = req.body;
+            const { assignmentId, appointmentId, diagnosisName, description } = req.body;
 
-            // Validation
-            if (!assignmentId || !diagnosisName) {
-                return res.status(400).json({ error: 'Assignment ID and Diagnosis Name are required' });
+            // Validation - must have either assignmentId or appointmentId, but not both
+            if ((!assignmentId && !appointmentId) || (assignmentId && appointmentId)) {
+                return res.status(400).json({ error: 'Either Assignment ID or Appointment ID (but not both) and Diagnosis Name are required' });
             }
 
-            // Safely convert IDs to ObjectIds
-            const assignmentObjectId = safeObjectId(assignmentId);
-            if (!assignmentObjectId) {
-                return res.status(400).json({ error: 'Invalid Assignment ID format' });
+            if (!diagnosisName) {
+                return res.status(400).json({ error: 'Diagnosis Name is required' });
             }
 
             // Validate diagnosis name length
@@ -45,21 +43,55 @@ const diagnosisController = {
             }
 
             const dbInstance = await connectDB();
+            let sourceObject = null;
+            let sourceType = null;
+            let sourceObjectId = null;
 
-            // Verify assignment exists
-            const assignment = await dbInstance.collection('assignments').findOne({
-                _id: assignmentObjectId
-            });
+            // Check if it's an assignment or appointment
+            if (assignmentId) {
+                sourceObjectId = safeObjectId(assignmentId);
+                if (!sourceObjectId) {
+                    return res.status(400).json({ error: 'Invalid Assignment ID format' });
+                }
 
-            if (!assignment) {
-                return res.status(404).json({ error: 'Assignment not found' });
-            }
-
-            // Only allow diagnosis if assignment is in_progress
-            if (assignment.status !== 'in_progress') {
-                return res.status(400).json({
-                    error: 'Diagnosis can only be added to assignments that are in progress. Once completed, diagnoses cannot be added.'
+                sourceObject = await dbInstance.collection('assignments').findOne({
+                    _id: sourceObjectId
                 });
+
+                if (!sourceObject) {
+                    return res.status(404).json({ error: 'Assignment not found' });
+                }
+
+                // Only allow diagnosis if assignment is in_progress
+                if (sourceObject.status !== 'in_progress') {
+                    return res.status(400).json({
+                        error: 'Diagnosis can only be added to assignments that are in progress. Once completed, diagnoses cannot be added.'
+                    });
+                }
+
+                sourceType = 'assignment';
+            } else if (appointmentId) {
+                sourceObjectId = safeObjectId(appointmentId);
+                if (!sourceObjectId) {
+                    return res.status(400).json({ error: 'Invalid Appointment ID format' });
+                }
+
+                sourceObject = await dbInstance.collection('appointments').findOne({
+                    _id: sourceObjectId
+                });
+
+                if (!sourceObject) {
+                    return res.status(404).json({ error: 'Appointment not found' });
+                }
+
+                // Only allow diagnosis if appointment is confirmed or completed
+                if (sourceObject.status !== 'confirmed' && sourceObject.status !== 'completed') {
+                    return res.status(400).json({
+                        error: 'Diagnosis can only be added to appointments that are confirmed or completed.'
+                    });
+                }
+
+                sourceType = 'appointment';
             }
 
             // Check if user is doctor or admin
@@ -68,13 +100,13 @@ const diagnosisController = {
                 return res.status(403).json({ error: 'Only doctors and admins can create diagnoses' });
             }
 
-            // Get doctor ID - if admin is creating, use the assignment's doctorId
+            // Get doctor ID - if admin is creating, use the source's doctorId
             let doctorId;
             if (userRole === 'doctor') {
                 doctorId = safeObjectId(req.user.id);
             } else {
-                // Admin creating diagnosis - use assignment's doctor
-                doctorId = assignment.doctorId;
+                // Admin creating diagnosis - use source's doctor
+                doctorId = sourceObject.doctorId;
             }
 
             // Verify doctor exists
@@ -89,7 +121,6 @@ const diagnosisController = {
 
             // Create diagnosis
             const diagnosis = {
-                assignmentId: assignmentObjectId,
                 diagnosisName: diagnosisName.trim(),
                 description: description?.trim() || '',
                 diagnosedBy: doctorId,
@@ -97,18 +128,30 @@ const diagnosisController = {
                 updatedAt: new Date()
             };
 
+            // Add assignmentId or appointmentId based on source type
+            if (sourceType === 'assignment') {
+                diagnosis.assignmentId = sourceObjectId;
+            } else if (sourceType === 'appointment') {
+                diagnosis.appointmentId = sourceObjectId;
+            }
+
             const result = await dbInstance.collection('diagnoses').insertOne(diagnosis);
 
             // Format response
             const createdDiagnosis = {
                 id: result.insertedId.toString(),
-                assignmentId: assignmentObjectId.toString(),
                 diagnosisName: diagnosis.diagnosisName,
                 description: diagnosis.description,
                 diagnosedBy: doctorId.toString(),
                 diagnosedByName: doctor.name,
                 createdAt: diagnosis.createdAt
             };
+
+            if (sourceType === 'assignment') {
+                createdDiagnosis.assignmentId = sourceObjectId.toString();
+            } else if (sourceType === 'appointment') {
+                createdDiagnosis.appointmentId = sourceObjectId.toString();
+            }
 
             res.status(201).json({
                 message: 'Diagnosis created successfully',
@@ -130,13 +173,15 @@ const diagnosisController = {
                 .sort({ createdAt: -1 })
                 .toArray();
 
-            // Get unique assignment and doctor IDs
-            const assignmentIds = [...new Set(diagnoses.map(d => d.assignmentId))];
+            // Get unique assignment, appointment and doctor IDs
+            const assignmentIds = [...new Set(diagnoses.map(d => d.assignmentId).filter(Boolean))];
+            const appointmentIds = [...new Set(diagnoses.map(d => d.appointmentId).filter(Boolean))];
             const doctorIds = [...new Set(diagnoses.map(d => d.diagnosedBy))];
 
-            // Fetch assignments and doctors
-            const [assignments, doctors] = await Promise.all([
-                dbInstance.collection('assignments').find({ _id: { $in: assignmentIds } }).toArray(),
+            // Fetch assignments, appointments and doctors
+            const [assignments, appointments, doctors] = await Promise.all([
+                assignmentIds.length > 0 ? dbInstance.collection('assignments').find({ _id: { $in: assignmentIds } }).toArray() : [],
+                appointmentIds.length > 0 ? dbInstance.collection('appointments').find({ _id: { $in: appointmentIds } }).toArray() : [],
                 dbInstance.collection('users').find({ _id: { $in: doctorIds } }).toArray()
             ]);
 
@@ -146,28 +191,53 @@ const diagnosisController = {
                 assignmentMap[assignment._id.toString()] = assignment;
             });
 
+            const appointmentMap = {};
+            appointments.forEach(appointment => {
+                appointmentMap[appointment._id.toString()] = appointment;
+            });
+
             const doctorMap = {};
             doctors.forEach(doctor => {
                 doctorMap[doctor._id.toString()] = doctor.name;
             });
 
             // Format diagnoses with resolved names
-            const formattedDiagnoses = diagnoses.map(diagnosis => ({
-                id: diagnosis._id.toString(),
-                assignmentId: diagnosis.assignmentId.toString(),
-                diagnosisName: diagnosis.diagnosisName,
-                description: diagnosis.description,
-                diagnosedBy: diagnosis.diagnosedBy.toString(),
-                diagnosedByName: doctorMap[diagnosis.diagnosedBy.toString()] || 'Unknown',
-                assignment: assignmentMap[diagnosis.assignmentId.toString()] ? {
-                    id: assignmentMap[diagnosis.assignmentId.toString()]._id.toString(),
-                    patientId: assignmentMap[diagnosis.assignmentId.toString()].patientId.toString(),
-                    doctorId: assignmentMap[diagnosis.assignmentId.toString()].doctorId.toString(),
-                    status: assignmentMap[diagnosis.assignmentId.toString()].status
-                } : null,
-                createdAt: diagnosis.createdAt,
-                updatedAt: diagnosis.updatedAt
-            }));
+            const formattedDiagnoses = diagnoses.map(diagnosis => {
+                const formatted = {
+                    id: diagnosis._id.toString(),
+                    assignmentId: diagnosis.assignmentId ? diagnosis.assignmentId.toString() : null,
+                    appointmentId: diagnosis.appointmentId ? diagnosis.appointmentId.toString() : null,
+                    diagnosisName: diagnosis.diagnosisName,
+                    description: diagnosis.description,
+                    diagnosedBy: diagnosis.diagnosedBy.toString(),
+                    diagnosedByName: doctorMap[diagnosis.diagnosedBy.toString()] || 'Unknown',
+                    createdAt: diagnosis.createdAt,
+                    updatedAt: diagnosis.updatedAt
+                };
+
+                // Add assignment or appointment details
+                if (diagnosis.assignmentId) {
+                    const assignment = assignmentMap[diagnosis.assignmentId.toString()];
+                    formatted.assignment = assignment ? {
+                        id: assignment._id.toString(),
+                        patientId: assignment.patientId.toString(),
+                        doctorId: assignment.doctorId.toString(),
+                        status: assignment.status
+                    } : null;
+                }
+
+                if (diagnosis.appointmentId) {
+                    const appointment = appointmentMap[diagnosis.appointmentId.toString()];
+                    formatted.appointment = appointment ? {
+                        id: appointment._id.toString(),
+                        patientId: appointment.patientId.toString(),
+                        doctorId: appointment.doctorId.toString(),
+                        status: appointment.status
+                    } : null;
+                }
+
+                return formatted;
+            });
 
             res.status(200).json({
                 diagnoses: formattedDiagnoses
@@ -198,28 +268,42 @@ const diagnosisController = {
                 return res.status(404).json({ error: 'Diagnosis not found' });
             }
 
-            // Get assignment and doctor details
-            const [assignment, doctor] = await Promise.all([
-                dbInstance.collection('assignments').findOne({ _id: diagnosis.assignmentId }),
+            // Get assignment, appointment and doctor details
+            const [assignment, appointment, doctor] = await Promise.all([
+                diagnosis.assignmentId ? dbInstance.collection('assignments').findOne({ _id: diagnosis.assignmentId }) : null,
+                diagnosis.appointmentId ? dbInstance.collection('appointments').findOne({ _id: diagnosis.appointmentId }) : null,
                 dbInstance.collection('users').findOne({ _id: diagnosis.diagnosedBy })
             ]);
 
             const formattedDiagnosis = {
                 id: diagnosis._id.toString(),
-                assignmentId: diagnosis.assignmentId.toString(),
+                assignmentId: diagnosis.assignmentId ? diagnosis.assignmentId.toString() : null,
+                appointmentId: diagnosis.appointmentId ? diagnosis.appointmentId.toString() : null,
                 diagnosisName: diagnosis.diagnosisName,
                 description: diagnosis.description,
                 diagnosedBy: diagnosis.diagnosedBy.toString(),
                 diagnosedByName: doctor ? doctor.name : 'Unknown',
-                assignment: assignment ? {
+                createdAt: diagnosis.createdAt,
+                updatedAt: diagnosis.updatedAt
+            };
+
+            if (assignment) {
+                formattedDiagnosis.assignment = {
                     id: assignment._id.toString(),
                     patientId: assignment.patientId.toString(),
                     doctorId: assignment.doctorId.toString(),
                     status: assignment.status
-                } : null,
-                createdAt: diagnosis.createdAt,
-                updatedAt: diagnosis.updatedAt
-            };
+                };
+            }
+
+            if (appointment) {
+                formattedDiagnosis.appointment = {
+                    id: appointment._id.toString(),
+                    patientId: appointment.patientId.toString(),
+                    doctorId: appointment.doctorId.toString(),
+                    status: appointment.status
+                };
+            }
 
             res.status(200).json({
                 diagnosis: formattedDiagnosis
@@ -273,7 +357,8 @@ const diagnosisController = {
             // Format diagnoses
             const formattedDiagnoses = diagnoses.map(diagnosis => ({
                 id: diagnosis._id.toString(),
-                assignmentId: diagnosis.assignmentId.toString(),
+                assignmentId: diagnosis.assignmentId ? diagnosis.assignmentId.toString() : null,
+                appointmentId: diagnosis.appointmentId ? diagnosis.appointmentId.toString() : null,
                 diagnosisName: diagnosis.diagnosisName,
                 description: diagnosis.description,
                 diagnosedBy: diagnosis.diagnosedBy.toString(),
@@ -294,6 +379,74 @@ const diagnosisController = {
 
         } catch (error) {
             console.error('Get diagnoses by assignment error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    // Get diagnoses by appointment ID
+    getDiagnosesByAppointment: async (req, res) => {
+        try {
+            const { appointmentId } = req.params;
+
+            const appointmentObjectId = safeObjectId(appointmentId);
+            if (!appointmentObjectId) {
+                return res.status(400).json({ error: 'Invalid Appointment ID format' });
+            }
+
+            const dbInstance = await connectDB();
+
+            // Verify appointment exists
+            const appointment = await dbInstance.collection('appointments').findOne({
+                _id: appointmentObjectId
+            });
+
+            if (!appointment) {
+                return res.status(404).json({ error: 'Appointment not found' });
+            }
+
+            // Get diagnoses for this appointment
+            const diagnoses = await dbInstance.collection('diagnoses')
+                .find({ appointmentId: appointmentObjectId })
+                .sort({ createdAt: -1 })
+                .toArray();
+
+            // Get doctor IDs
+            const doctorIds = [...new Set(diagnoses.map(d => d.diagnosedBy))];
+            const doctors = await dbInstance.collection('users').find({
+                _id: { $in: doctorIds }
+            }).toArray();
+
+            // Create doctor map
+            const doctorMap = {};
+            doctors.forEach(doctor => {
+                doctorMap[doctor._id.toString()] = doctor.name;
+            });
+
+            // Format diagnoses
+            const formattedDiagnoses = diagnoses.map(diagnosis => ({
+                id: diagnosis._id.toString(),
+                assignmentId: diagnosis.assignmentId ? diagnosis.assignmentId.toString() : null,
+                appointmentId: diagnosis.appointmentId ? diagnosis.appointmentId.toString() : null,
+                diagnosisName: diagnosis.diagnosisName,
+                description: diagnosis.description,
+                diagnosedBy: diagnosis.diagnosedBy.toString(),
+                diagnosedByName: doctorMap[diagnosis.diagnosedBy.toString()] || 'Unknown',
+                createdAt: diagnosis.createdAt,
+                updatedAt: diagnosis.updatedAt
+            }));
+
+            res.status(200).json({
+                diagnoses: formattedDiagnoses,
+                appointment: {
+                    id: appointment._id.toString(),
+                    patientId: appointment.patientId.toString(),
+                    doctorId: appointment.doctorId.toString(),
+                    status: appointment.status
+                }
+            });
+
+        } catch (error) {
+            console.error('Get diagnoses by appointment error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     },

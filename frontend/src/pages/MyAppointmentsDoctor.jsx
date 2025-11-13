@@ -1,64 +1,52 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { hmsApi } from "../services/api";
-import CreateAppointmentModal from "../components/CreateAppointmentModal";
+import { toast } from "react-toastify";
 
-const MyAppointments = () => {
+const MyAppointmentsDoctor = () => {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  const [currentPatientId, setCurrentPatientId] = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState(null);
 
   useEffect(() => {
-    loadPatientInfo();
     loadAppointments();
   }, []);
-
-  const loadPatientInfo = async () => {
-    try {
-      const profile = await hmsApi.getProfile();
-      if (profile.user && profile.user.role === "patient") {
-        setCurrentPatientId(profile.user.id);
-      }
-    } catch (err) {
-      console.error("Failed to load patient info:", err);
-    }
-  };
 
   const loadAppointments = async () => {
     try {
       setLoading(true);
-      const resp = await hmsApi.getMyAppointments();
+      const resp = await hmsApi.getMyAppointmentsDoctor();
       setAppointments(resp.appointments || []);
     } catch (err) {
-      setError("Failed to load your appointments: " + err.message);
+      setError("Failed to load appointments: " + err.message);
+      toast.error("Failed to load appointments");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateAppointment = () => {
-    setShowAppointmentModal(true);
-  };
-
-  const handleAppointmentSuccess = async (newAppointment) => {
-    setShowAppointmentModal(false);
-    await loadAppointments();
-  };
-
-  const handleCancelAppointment = async (appointmentId) => {
-    if (!window.confirm("Are you sure you want to cancel this appointment?")) {
+  const handleUpdateStatus = async (appointmentId, newStatus) => {
+    if (!window.confirm(`Are you sure you want to mark this appointment as ${newStatus}?`)) {
       return;
     }
 
     try {
-      await hmsApi.updateAppointmentStatus(appointmentId, { status: "cancelled" });
-      await loadAppointments();
+      setUpdatingStatus(appointmentId);
+      await hmsApi.updateAppointmentStatus(appointmentId, { status: newStatus });
+      toast.success(`Appointment ${newStatus} successfully`);
+      
+      // If completing an appointment, redirect to diagnosis page
+      if (newStatus === "completed") {
+        navigate(`/diagnosis/appointment/${appointmentId}`);
+      } else {
+        await loadAppointments();
+      }
     } catch (err) {
-      setError("Failed to cancel appointment: " + err.message);
+      toast.error("Failed to update appointment status: " + err.message);
+      setUpdatingStatus(null);
     }
   };
 
@@ -81,10 +69,14 @@ const MyAppointments = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const formatDateTime = (dateString, timeString) => {
-    if (!dateString || !timeString) return "N/A";
-    const date = new Date(`${dateString}T${timeString}`);
-    return date.toLocaleString();
+  const formatTimeRange = (startTime, endTime) => {
+    if (!startTime) return "N/A";
+    const start = formatTime(startTime);
+    if (endTime) {
+      const end = formatTime(endTime);
+      return `${start} - ${end}`;
+    }
+    return start;
   };
 
   const getStatusColor = (status) => {
@@ -118,12 +110,6 @@ const MyAppointments = () => {
           <div className="text-sm text-gray-600">
             Total: {appointments.length}
           </div>
-          <button
-            onClick={handleCreateAppointment}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Book New Appointment
-          </button>
         </div>
       </div>
 
@@ -162,7 +148,7 @@ const MyAppointments = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Doctor
+                  Patient
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Department
@@ -171,7 +157,10 @@ const MyAppointments = () => {
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Time
+                  Time Slot
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Symptoms
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -185,7 +174,7 @@ const MyAppointments = () => {
               {filteredAppointments.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="7"
                     className="px-6 py-4 text-center text-gray-500"
                   >
                     No appointments found
@@ -196,7 +185,7 @@ const MyAppointments = () => {
                   <tr key={a.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {a.doctorName || "Doctor"}
+                        {a.patientName || "Patient"}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -206,7 +195,12 @@ const MyAppointments = () => {
                       {formatDate(a.appointmentDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatTime(a.appointmentTime)}
+                      {formatTimeRange(a.startTime || a.appointmentTime, a.endTime)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 max-w-xs truncate">
+                        {a.symptoms || "No symptoms"}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -219,21 +213,53 @@ const MyAppointments = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        {a.status === "scheduled" || a.status === "confirmed" ? (
-                          <button
-                            onClick={() => handleCancelAppointment(a.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Cancel
-                          </button>
-                        ) : null}
+                        {a.status === "scheduled" && (
+                          <>
+                            <button
+                              onClick={() => handleUpdateStatus(a.id, "confirmed")}
+                              disabled={updatingStatus === a.id}
+                              className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                            >
+                              {updatingStatus === a.id ? "Updating..." : "Confirm"}
+                            </button>
+                            <button
+                              onClick={() => handleUpdateStatus(a.id, "cancelled")}
+                              disabled={updatingStatus === a.id}
+                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
+                        {a.status === "confirmed" && (
+                          <>
+                            <button
+                              onClick={() => handleUpdateStatus(a.id, "completed")}
+                              disabled={updatingStatus === a.id}
+                              className="text-blue-600 hover:text-blue-900 disabled:opacity-50"
+                            >
+                              {updatingStatus === a.id ? "Updating..." : "Complete"}
+                            </button>
+                            <button
+                              onClick={() => handleUpdateStatus(a.id, "cancelled")}
+                              disabled={updatingStatus === a.id}
+                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
                         {a.status === "completed" && (
                           <button
                             onClick={() => navigate(`/diagnosis/appointment/${a.id}`)}
                             className="text-blue-600 hover:text-blue-900"
+                            title="View Diagnosis"
                           >
-                            View Details
+                            View Diagnosis
                           </button>
+                        )}
+                        {a.status === "cancelled" && (
+                          <span className="text-gray-400">Cancelled</span>
                         )}
                       </div>
                     </td>
@@ -244,18 +270,9 @@ const MyAppointments = () => {
           </table>
         </div>
       </div>
-
-      {/* Create Appointment Modal */}
-      {showAppointmentModal && (
-        <CreateAppointmentModal
-          onClose={() => setShowAppointmentModal(false)}
-          onSuccess={handleAppointmentSuccess}
-          currentPatientId={currentPatientId}
-        />
-      )}
     </div>
   );
 };
 
-export default MyAppointments;
+export default MyAppointmentsDoctor;
 

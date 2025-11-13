@@ -292,7 +292,7 @@ const AssignmentManagement = () => {
                             </button>
                             <button
                               onClick={() =>
-                                navigate(`/diagnosis/${assignment.id}`)
+                                navigate(`/diagnosis/assignment/${assignment.id}`)
                               }
                               className="text-blue-600 hover:text-blue-900"
                             >
@@ -314,7 +314,7 @@ const AssignmentManagement = () => {
                         {assignment.status === "completed" && (
                           <button
                             onClick={() =>
-                              navigate(`/diagnosis/${assignment.id}`)
+                              navigate(`/diagnosis/assignment/${assignment.id}`)
                             }
                             className="text-gray-700 hover:text-gray-900"
                           >
