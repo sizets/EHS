@@ -7,6 +7,7 @@ const assignmentController = require('../controllers/assignmentController');
 const appointmentController = require('../controllers/appointmentController');
 const diagnosisController = require('../controllers/diagnosisController');
 const testController = require('../controllers/testController');
+const billingController = require('../controllers/billingController');
 const authenticate = require('../middleware/authenticate');
 const requireAdmin = require('../middleware/requireAdmin');
 
@@ -87,6 +88,14 @@ router.get('/tests/:id', authenticate, testController.getTestById);
 router.post('/tests', authenticate, testController.createTest);
 router.put('/tests/:id', authenticate, testController.updateTest);
 router.delete('/tests/:id', authenticate, testController.deleteTest);
+
+// Billing/Charges Management Routes
+router.get('/charges', authenticate, requireAdmin, billingController.getAllCharges);
+router.get('/charges/patient/:patientId', authenticate, billingController.getChargesByPatient);
+router.get('/charges/assignment/:assignmentId', authenticate, billingController.getChargesByAssignment);
+router.post('/charges', authenticate, requireAdmin, billingController.createCharge);
+router.put('/charges/:id/status', authenticate, requireAdmin, billingController.updateChargeStatus);
+router.delete('/charges/:id', authenticate, requireAdmin, billingController.deleteCharge);
 
 // Profile management routes
 router.put('/profile', authenticate, userController.updateProfile);

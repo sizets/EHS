@@ -138,6 +138,43 @@ const assignmentController = {
             };
 
             const result = await dbInstance.collection('assignments').insertOne(assignment);
+            const assignmentId = result.insertedId;
+
+            // Automatically add emergency charges for all assignments (all assignments are for emergencies)
+            try {
+                const emergencyCharges = [
+                    {
+                        patientId: patientObjectId,
+                        assignmentId: assignmentId,
+                        chargeName: 'Emergency Admission Fee',
+                        amount: 500, // Default amount - can be configured later
+                        description: 'Emergency room admission fee',
+                        chargeType: 'emergency',
+                        status: 'pending',
+                        createdBy: req.user.id,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    },
+                    {
+                        patientId: patientObjectId,
+                        assignmentId: assignmentId,
+                        chargeName: 'Doctor Charge',
+                        amount: 1000, // Default amount - can be configured later
+                        description: 'Emergency doctor consultation charge',
+                        chargeType: 'doctor',
+                        status: 'pending',
+                        createdBy: req.user.id,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                ];
+
+                await dbInstance.collection('charges').insertMany(emergencyCharges);
+                console.log('✅ Emergency charges added automatically for assignment:', assignmentId.toString());
+            } catch (chargeError) {
+                // Log error but don't fail the assignment creation
+                console.error('⚠️ Failed to create emergency charges:', chargeError);
+            }
 
             res.status(201).json({
                 message: 'Assignment created successfully',
