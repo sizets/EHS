@@ -6,11 +6,11 @@ const authenticate = async (req, res, next) => {
     try {
         // Check for token in Authorization header only
         let token = req.headers.authorization;
-        
+
         if (!token || !token.startsWith('Bearer ')) {
             return res.status(401).send({ error: 'No token provided' });
         }
-        
+
         token = token.slice(7); // Remove 'Bearer ' prefix
 
         const decoded = jwt.verify(token, 'randomsecretkey12345');
@@ -18,7 +18,7 @@ const authenticate = async (req, res, next) => {
 
         const user = await dbInstance.collection('users').findOne({ _id: new ObjectId(decoded.userId) });
         if (!user) {
-            return res.status(404).send({ error: 'User not found' });
+            return res.status(401).send({ error: 'User not found' });
         }
 
         req.user = {

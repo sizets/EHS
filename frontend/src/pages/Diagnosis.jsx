@@ -5,10 +5,11 @@ import { hmsApi } from "../services/api";
 import ConfirmModal from "../components/ConfirmModal";
 
 const Diagnosis = () => {
-  const { assignmentId } = useParams();
+  const { assignmentId, appointmentId } = useParams();
   const navigate = useNavigate();
 
-  const [assignment, setAssignment] = useState(null);
+  const [source, setSource] = useState(null); // Can be assignment or appointment
+  const [sourceType, setSourceType] = useState(null); // 'assignment' or 'appointment'
   const [diagnoses, setDiagnoses] = useState([]);
   const userRole = localStorage.getItem("role");
   const [loading, setLoading] = useState(true);
@@ -24,17 +25,25 @@ const Diagnosis = () => {
   });
 
   useEffect(() => {
-    if (assignmentId) {
+    if (assignmentId || appointmentId) {
       loadDiagnosisData();
     }
-  }, [assignmentId]);
+  }, [assignmentId, appointmentId]);
 
   const loadDiagnosisData = async () => {
     try {
       setLoading(true);
-      const response = await hmsApi.getDiagnosesByAssignment(assignmentId);
+      let response;
+      if (assignmentId) {
+        response = await hmsApi.getDiagnosesByAssignment(assignmentId);
+        setSource(response.assignment || null);
+        setSourceType("assignment");
+      } else if (appointmentId) {
+        response = await hmsApi.getDiagnosesByAppointment(appointmentId);
+        setSource(response.appointment || null);
+        setSourceType("appointment");
+      }
       setDiagnoses(response.diagnoses || []);
-      setAssignment(response.assignment || null);
     } catch (err) {
       setError("Failed to load diagnosis data: " + err.message);
       toast.error("Failed to load diagnosis data");
@@ -60,11 +69,18 @@ const Diagnosis = () => {
     }
 
     try {
-      await hmsApi.createDiagnosis({
-        assignmentId,
+      const diagnosisData = {
         diagnosisName: formData.diagnosisName,
         description: formData.description,
-      });
+      };
+
+      if (assignmentId) {
+        diagnosisData.assignmentId = assignmentId;
+      } else if (appointmentId) {
+        diagnosisData.appointmentId = appointmentId;
+      }
+
+      await hmsApi.createDiagnosis(diagnosisData);
 
       toast.success("Diagnosis created successfully");
       setShowCreateModal(false);
@@ -138,17 +154,22 @@ const Diagnosis = () => {
     );
   }
 
-  if (error && !assignment) {
+  if (error && !source) {
     return (
       <div className="p-6">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           {error}
         </div>
         <button
-          onClick={() => navigate("/assignments")}
+          onClick={() =>
+            navigate(
+              sourceType === "appointment" ? "/appointments" : "/assignments"
+            )
+          }
           className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
         >
-          Back to Assignments
+          Back to{" "}
+          {sourceType === "appointment" ? "Appointments" : "Assignments"}
         </button>
       </div>
     );
@@ -159,33 +180,46 @@ const Diagnosis = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <button
-            onClick={() =>
-              navigate(
-                userRole === "patient" ? "/my-assignments" : "/assignments"
-              )
-            }
+            onClick={() => {
+              if (sourceType === "appointment") {
+                navigate(
+                  userRole === "patient" ? "/my-appointments" : "/appointments"
+                );
+              } else {
+                navigate(
+                  userRole === "patient" ? "/my-assignments" : "/assignments"
+                );
+              }
+            }}
             className="text-blue-600 hover:text-blue-800 mb-2 flex items-center"
           >
-            ← Back to Assignments
+            ← Back to{" "}
+            {sourceType === "appointment" ? "Appointments" : "Assignments"}
           </button>
           <h1 className="text-3xl font-bold text-gray-800">
             Diagnosis Management
           </h1>
-          {assignment && (
+          {source && (
             <p className="text-gray-600 mt-2">
-              Assignment ID: {assignment.id?.slice(-8)} | Status:{" "}
-              <span className="font-semibold">{assignment.status}</span>
+              {sourceType === "appointment" ? "Appointment" : "Assignment"} ID:{" "}
+              {source.id?.slice(-8)} | Status:{" "}
+              <span className="font-semibold">{source.status}</span>
             </p>
           )}
         </div>
-        {assignment?.status === "in_progress" && userRole !== "patient" && (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            + Add Diagnosis
-          </button>
-        )}
+        {source &&
+          ((sourceType === "assignment" && source.status === "in_progress") ||
+            (sourceType === "appointment" &&
+              (source.status === "confirmed" ||
+                source.status === "completed"))) &&
+          userRole !== "patient" && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              + Add Diagnosis
+            </button>
+          )}
       </div>
 
       {error && (
@@ -199,7 +233,8 @@ const Diagnosis = () => {
         {diagnoses.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             <p className="text-lg mb-2">
-              No diagnoses found for this assignment
+              No diagnoses found for this{" "}
+              {sourceType === "appointment" ? "appointment" : "assignment"}
             </p>
             {userRole !== "patient" && (
               <button

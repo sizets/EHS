@@ -50,6 +50,11 @@ const Sidebar = () => {
             href: "/my-appointments-doctor",
             icon: "appointments",
           },
+          {
+            name: "My Assignments",
+            href: "/my-assignments-doctor",
+            icon: "assignments",
+          },
         ]
       : []),
     ...(userRole === "patient"

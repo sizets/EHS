@@ -1,3 +1,5 @@
+import { toast } from "react-toastify";
+
 export const API_BASE = "http://localhost:8081/api";
 
 function getAuthHeaders() {
@@ -26,6 +28,28 @@ async function request(path, options = {}) {
             if (!res.ok) {
                 throw new Error(`Request failed with status ${res.status}`);
             }
+        }
+
+        // Handle 401 Unauthorized - token is invalid or expired
+        if (res.status === 401) {
+            // Clear authentication data
+            localStorage.removeItem('token');
+            localStorage.removeItem('role');
+            
+            // Only redirect if not already on a public route
+            const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password'];
+            const currentPath = window.location.pathname;
+            
+            if (!publicRoutes.includes(currentPath)) {
+                // Show a toast notification
+                toast.error('Your session has expired. Please login again.');
+                // Redirect to login page
+                window.location.href = '/login';
+            }
+            
+            // Throw error with appropriate message
+            const errorMessage = data.error || data.message || 'Token is not valid or expired';
+            throw new Error(errorMessage);
         }
 
         if (!res.ok) {
@@ -124,11 +148,14 @@ export const hmsApi = {
     // Doctor-specific assignment methods
     getMyAssignments: () => request('/my-assignments'),
     updateMyAssignmentStatus: (id, body) => request(`/my-assignments/${id}/status`, { method: 'PUT', body: JSON.stringify(body) }),
+    // Patient-specific assignment methods
+    getMyAssignmentsPatient: () => request('/my-assignments-patient'),
 
     // Diagnosis Management (Doctor and Admin)
     getAllDiagnoses: () => request('/diagnoses'),
     getDiagnosisById: (id) => request(`/diagnoses/${id}`),
     getDiagnosesByAssignment: (assignmentId) => request(`/diagnoses/assignment/${assignmentId}`),
+    getDiagnosesByAppointment: (appointmentId) => request(`/diagnoses/appointment/${appointmentId}`),
     createDiagnosis: (body) => request('/diagnoses', { method: 'POST', body: JSON.stringify(body) }),
     updateDiagnosis: (id, body) => request(`/diagnoses/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     deleteDiagnosis: (id) => request(`/diagnoses/${id}`, { method: 'DELETE' }),

@@ -17,6 +17,7 @@ import MyPatients from "./pages/MyPatients";
 import DoctorProfile from "./pages/DoctorProfile";
 import Diagnosis from "./pages/Diagnosis";
 import MyAssignments from "./pages/MyAssignments.jsx";
+import MyAssignmentsDoctor from "./pages/MyAssignmentsDoctor.jsx";
 import MyAppointments from "./pages/MyAppointments.jsx";
 import MyAppointmentsDoctor from "./pages/MyAppointmentsDoctor.jsx";
 import AppointmentManagement from "./pages/AppointmentManagement.jsx";
@@ -97,7 +98,15 @@ const App = () => {
           }
         />
         <Route
-          path="/diagnosis/:assignmentId"
+          path="/diagnosis/assignment/:assignmentId"
+          element={
+            <ProtectedRoute requiredRole={["doctor", "admin", "patient"]}>
+              <Diagnosis />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/diagnosis/appointment/:appointmentId"
           element={
             <ProtectedRoute requiredRole={["doctor", "admin", "patient"]}>
               <Diagnosis />
@@ -126,6 +135,14 @@ const App = () => {
           element={
             <ProtectedRoute requiredRole="doctor">
               <MyAppointmentsDoctor />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-assignments-doctor"
+          element={
+            <ProtectedRoute requiredRole="doctor">
+              <MyAssignmentsDoctor />
             </ProtectedRoute>
           }
         />

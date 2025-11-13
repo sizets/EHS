@@ -445,12 +445,30 @@ const userController = {
                 role: role.toLowerCase()
             }).toArray();
 
-            // Remove passwords from response
+            // Get department names for doctors
+            const departmentIds = [...new Set(users.filter(u => u.department).map(u => u.department))];
+            const departments = await dbInstance.collection('departments')
+                .find({ _id: { $in: departmentIds } })
+                .toArray();
+
+            const departmentMap = {};
+            departments.forEach(dept => {
+                departmentMap[dept._id.toString()] = dept.name;
+            });
+
+            // Remove passwords from response and populate department names
             const safeUsers = users.map(user => {
                 const { password, resetToken, resetTokenExpiry, ...safeUser } = user;
                 // Convert _id to id and ensure it's a string
                 safeUser.id = user._id.toString();
                 delete safeUser._id;
+
+                // Add department name for doctors
+                if (user.department) {
+                    safeUser.departmentName = departmentMap[user.department.toString()] || 'Unknown';
+                    safeUser.departmentId = user.department.toString();
+                }
+
                 return safeUser;
             });
 

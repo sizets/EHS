@@ -8,6 +8,8 @@ const DoctorManagement = () => {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [doctorAssignments, setDoctorAssignments] = useState([]);
   const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [doctorAppointments, setDoctorAppointments] = useState([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
 
   useEffect(() => {
     loadDoctors();
@@ -28,19 +30,26 @@ const DoctorManagement = () => {
   const handleViewDoctor = async (doctor) => {
     setSelectedDoctor(doctor);
     setLoadingAssignments(true);
+    setLoadingAppointments(true);
     try {
-      const response = await hmsApi.getAssignmentsByDoctor(doctor.id);
-      setDoctorAssignments(response.assignments || []);
+      const [assignmentsResponse, appointmentsResponse] = await Promise.all([
+        hmsApi.getAssignmentsByDoctor(doctor.id),
+        hmsApi.getAppointmentsByDoctor(doctor.id),
+      ]);
+      setDoctorAssignments(assignmentsResponse.assignments || []);
+      setDoctorAppointments(appointmentsResponse.appointments || []);
     } catch (err) {
-      setError("Failed to load doctor assignments: " + err.message);
+      setError("Failed to load doctor data: " + err.message);
     } finally {
       setLoadingAssignments(false);
+      setLoadingAppointments(false);
     }
   };
 
   const handleBackToList = () => {
     setSelectedDoctor(null);
     setDoctorAssignments([]);
+    setDoctorAppointments([]);
   };
 
   const getStatusColor = (status) => {
@@ -83,6 +92,40 @@ const DoctorManagement = () => {
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString();
+  };
+
+  const formatTime = (timeString) => {
+    if (!timeString) return "N/A";
+    const [hours, minutes] = timeString.split(":");
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const formatTimeRange = (startTime, endTime) => {
+    if (!startTime) return "N/A";
+    const start = formatTime(startTime);
+    if (endTime) {
+      const end = formatTime(endTime);
+      return `${start} - ${end}`;
+    }
+    return start;
+  };
+
+  const getAppointmentStatusColor = (status) => {
+    switch (status) {
+      case "scheduled":
+        return "bg-blue-100 text-blue-800";
+      case "confirmed":
+        return "bg-green-100 text-green-800";
+      case "completed":
+        return "bg-gray-100 text-gray-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
   };
 
   const getUniquePatients = () => {
@@ -182,7 +225,7 @@ const DoctorManagement = () => {
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
             Patient Summary
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="font-semibold text-blue-900">Total Patients</h3>
               <p className="text-2xl font-bold text-blue-700">
@@ -195,6 +238,14 @@ const DoctorManagement = () => {
               </h3>
               <p className="text-2xl font-bold text-green-700">
                 {doctorAssignments.length}
+              </p>
+            </div>
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-orange-900">
+                Total Appointments
+              </h3>
+              <p className="text-2xl font-bold text-orange-700">
+                {doctorAppointments.length}
               </p>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg">
@@ -232,9 +283,6 @@ const DoctorManagement = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Last Assignment
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -266,19 +314,6 @@ const DoctorManagement = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(patient.lastAssignment)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => {
-                            const patientAssignments = doctorAssignments.filter(
-                              (a) => a.patientId === patient.id
-                            );
-                            // You could implement a detailed view here
-                          }}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          View Details
-                        </button>
                       </td>
                     </tr>
                   ))
@@ -370,6 +405,105 @@ const DoctorManagement = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(assignment.assignedAt)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Appointment History */}
+        <div className="bg-white rounded-lg shadow overflow-hidden mt-6">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-800">
+              Appointment History
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Patient
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date & Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Department
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Symptoms
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {loadingAppointments ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-4 text-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    </td>
+                  </tr>
+                ) : doctorAppointments.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="5"
+                      className="px-6 py-4 text-center text-gray-500"
+                    >
+                      No appointments found
+                    </td>
+                  </tr>
+                ) : (
+                  doctorAppointments.map((appointment) => (
+                    <tr key={appointment.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {appointment.patientName}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          ID: {appointment.patientId.slice(-8)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {appointment.appointmentDate
+                            ? new Date(appointment.appointmentDate).toLocaleDateString()
+                            : appointment.appointmentDateTime
+                            ? new Date(appointment.appointmentDateTime).toLocaleDateString()
+                            : "N/A"}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatTimeRange(
+                            appointment.startTime || appointment.appointmentTime,
+                            appointment.endTime
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {appointment.department || "Not assigned"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getAppointmentStatusColor(
+                            appointment.status
+                          )}`}
+                        >
+                          {appointment.status
+                            ? appointment.status.toUpperCase()
+                            : "N/A"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {appointment.symptoms
+                          ? appointment.symptoms.length > 50
+                            ? `${appointment.symptoms.substring(0, 50)}...`
+                            : appointment.symptoms
+                          : "N/A"}
                       </td>
                     </tr>
                   ))

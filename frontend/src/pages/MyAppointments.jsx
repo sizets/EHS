@@ -239,7 +239,7 @@ const MyAppointments = () => {
                         ) : null}
                         {a.status === "completed" && (
                           <button
-                            onClick={() => navigate(`/diagnosis/${a.id}`)}
+                            onClick={() => navigate(`/diagnosis/appointment/${a.id}`)}
                             className="text-blue-600 hover:text-blue-900"
                           >
                             View Details
