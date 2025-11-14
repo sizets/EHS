@@ -170,4 +170,14 @@ export const hmsApi = {
 
     // Profile management
     updateProfile: (body) => request('/profile', { method: 'PUT', body: JSON.stringify(body) }),
+
+    // Billing/Charges Management
+    getAllCharges: () => request('/charges'),
+    getChargesByPatient: (patientId) => request(`/charges/patient/${patientId}`),
+    getChargesByAssignment: (assignmentId) => request(`/charges/assignment/${assignmentId}`),
+    createCharge: (body) => request('/charges', { method: 'POST', body: JSON.stringify(body) }),
+    updateChargeStatus: (id, body) => request(`/charges/${id}/status`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteCharge: (id) => request(`/charges/${id}`, { method: 'DELETE' }),
+    // Patient-specific billing methods
+    getMyCharges: () => request('/my-charges'),
 };

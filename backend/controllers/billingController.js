@@ -146,6 +146,53 @@ const billingController = {
         }
     },
 
+    // Get charges for the current patient (patient-specific)
+    getMyCharges: async (req, res) => {
+        try {
+            const patientId = req.user.id; // Get patient ID from authenticated user
+
+            const patientObjectId = safeObjectId(patientId);
+            if (!patientObjectId) {
+                return res.status(400).json({ error: 'Invalid patient ID format' });
+            }
+
+            const dbInstance = await connectDB();
+
+            // Verify the user is a patient
+            const patient = await dbInstance.collection('users').findOne({
+                _id: patientObjectId,
+                role: 'patient'
+            });
+            if (!patient) {
+                return res.status(403).json({ error: 'Access denied. Only patients can view their charges.' });
+            }
+
+            const charges = await dbInstance.collection('charges')
+                .find({ patientId: patientObjectId })
+                .sort({ createdAt: -1 })
+                .toArray();
+
+            const formattedCharges = charges.map(charge => ({
+                id: charge._id.toString(),
+                patientId: charge.patientId.toString(),
+                assignmentId: charge.assignmentId ? charge.assignmentId.toString() : null,
+                chargeName: charge.chargeName,
+                amount: charge.amount,
+                description: charge.description,
+                chargeType: charge.chargeType,
+                status: charge.status,
+                createdBy: charge.createdBy,
+                createdAt: charge.createdAt,
+                updatedAt: charge.updatedAt
+            }));
+
+            res.json({ charges: formattedCharges });
+        } catch (error) {
+            console.error('Get my charges error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
     // Get all charges for an assignment
     getChargesByAssignment: async (req, res) => {
         try {

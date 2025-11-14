@@ -97,6 +97,9 @@ router.post('/charges', authenticate, requireAdmin, billingController.createChar
 router.put('/charges/:id/status', authenticate, requireAdmin, billingController.updateChargeStatus);
 router.delete('/charges/:id', authenticate, requireAdmin, billingController.deleteCharge);
 
+// Patient-specific billing routes
+router.get('/my-charges', authenticate, billingController.getMyCharges);
+
 // Profile management routes
 router.put('/profile', authenticate, userController.updateProfile);
 
