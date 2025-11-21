@@ -24,10 +24,9 @@ const Sidebar = () => {
   };
 
   const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: "dashboard" },
-    { name: "Home", href: "/", icon: "home" },
     ...(userRole === "admin"
       ? [
+          { name: "Dashboard", href: "/dashboard", icon: "dashboard" },
           { name: "User Management", href: "/users", icon: "users" },
           {
             name: "Department Management",

@@ -8,6 +8,7 @@ const appointmentController = require('../controllers/appointmentController');
 const diagnosisController = require('../controllers/diagnosisController');
 const testController = require('../controllers/testController');
 const billingController = require('../controllers/billingController');
+const dashboardController = require('../controllers/dashboardController');
 const authenticate = require('../middleware/authenticate');
 const requireAdmin = require('../middleware/requireAdmin');
 
@@ -20,6 +21,9 @@ router.get('/logout', authenticate, authController.logout);
 router.get('/profile', authenticate, authController.getProfile);
 router.post('/contact', authController.contact);
 router.post('/subscribe', authController.subscribe);
+
+// Dashboard Routes (Admin only)
+router.get('/dashboard/summary', authenticate, requireAdmin, dashboardController.getDashboardStats);
 
 // User Management Routes (Admin only)
 router.get('/users', authenticate, requireAdmin, userController.getAllUsers);
