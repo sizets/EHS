@@ -93,12 +93,15 @@ router.delete('/tests/:id', authenticate, testController.deleteTest);
 router.get('/charges', authenticate, requireAdmin, billingController.getAllCharges);
 router.get('/charges/patient/:patientId', authenticate, billingController.getChargesByPatient);
 router.get('/charges/assignment/:assignmentId', authenticate, billingController.getChargesByAssignment);
+router.get('/charges/appointment/:appointmentId', authenticate, billingController.getChargesByAppointment);
 router.post('/charges', authenticate, requireAdmin, billingController.createCharge);
 router.put('/charges/:id/status', authenticate, requireAdmin, billingController.updateChargeStatus);
 router.delete('/charges/:id', authenticate, requireAdmin, billingController.deleteCharge);
 
 // Patient-specific billing routes
 router.get('/my-charges', authenticate, billingController.getMyCharges);
+router.post('/charges/checkout', authenticate, billingController.createCheckoutSession);
+router.get('/charges/payment/success', authenticate, billingController.handlePaymentSuccess);
 
 // Profile management routes
 router.put('/profile', authenticate, userController.updateProfile);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { hmsApi } from "../services/api";
 import { toast } from "react-toastify";
 
@@ -7,9 +8,37 @@ const MyBills = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [processingPayment, setProcessingPayment] = useState(false);
+
+  const handlePaymentSuccess = async (chargeId) => {
+    try {
+      await hmsApi.handlePaymentSuccess(chargeId);
+      toast.success('Payment successful! Charge status updated.');
+      // Reload charges to reflect the updated status
+      loadCharges();
+    } catch (err) {
+      console.error('Error handling payment success:', err);
+      toast.error('Payment was successful, but there was an error updating the charge status.');
+    }
+  };
 
   useEffect(() => {
     loadCharges();
+    
+    // Check if redirected from Stripe payment
+    const paymentStatus = searchParams.get('payment');
+    const chargeId = searchParams.get('chargeId');
+    
+    if (paymentStatus === 'success' && chargeId) {
+      handlePaymentSuccess(chargeId);
+      // Clean up URL parameters
+      setSearchParams({});
+    } else if (paymentStatus === 'cancelled') {
+      toast.info('Payment was cancelled');
+      setSearchParams({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadCharges = async () => {
@@ -70,15 +99,25 @@ const MyBills = () => {
     }, 0);
   };
 
-  const handlePayNow = (charge) => {
-    // Redirect to Stripe checkout
-    // TODO: Replace with actual Stripe Checkout session URL from backend
-    // For now, this is a placeholder that can be updated with your Stripe integration
-    const stripeCheckoutUrl = `https://checkout.stripe.com/pay/${charge.id}`;
-    
-    // Alternative: You can create a Stripe Checkout session via your backend API
-    // and redirect to the session URL. For now, using a simple redirect.
-    window.location.href = stripeCheckoutUrl;
+  const handlePayNow = async (charge) => {
+    try {
+      setProcessingPayment(true);
+      
+      // Create Stripe checkout session
+      const response = await hmsApi.createCheckoutSession({ chargeId: charge.id });
+      
+      if (response.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = response.url;
+      } else {
+        toast.error('Failed to create payment session');
+        setProcessingPayment(false);
+      }
+    } catch (err) {
+      console.error('Error creating checkout session:', err);
+      toast.error('Failed to initiate payment: ' + err.message);
+      setProcessingPayment(false);
+    }
   };
 
   if (loading) {
@@ -217,9 +256,10 @@ const MyBills = () => {
                       {charge.status === "pending" && (
                         <button
                           onClick={() => handlePayNow(charge)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200"
+                          disabled={processingPayment}
+                          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200"
                         >
-                          Pay Now
+                          {processingPayment ? 'Processing...' : 'Pay Now'}
                         </button>
                       )}
                       {charge.status === "paid" && (
