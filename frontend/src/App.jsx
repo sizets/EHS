@@ -21,6 +21,7 @@ import MyAssignmentsDoctor from "./pages/MyAssignmentsDoctor.jsx";
 import MyAppointments from "./pages/MyAppointments.jsx";
 import MyAppointmentsDoctor from "./pages/MyAppointmentsDoctor.jsx";
 import AppointmentManagement from "./pages/AppointmentManagement.jsx";
+import MyBills from "./pages/MyBills.jsx";
 
 const App = () => {
   return (
@@ -127,6 +128,14 @@ const App = () => {
           element={
             <ProtectedRoute requiredRole="patient">
               <MyAppointments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-bills"
+          element={
+            <ProtectedRoute requiredRole="patient">
+              <MyBills />
             </ProtectedRoute>
           }
         />

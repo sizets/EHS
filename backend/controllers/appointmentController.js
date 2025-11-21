@@ -245,6 +245,43 @@ const appointmentController = {
             };
 
             const result = await dbInstance.collection('appointments').insertOne(appointment);
+            const appointmentId = result.insertedId;
+
+            // Automatically add appointment charges
+            try {
+                const appointmentCharges = [
+                    {
+                        patientId: patientObjectId,
+                        appointmentId: appointmentId,
+                        chargeName: 'Appointment Booking Fee',
+                        amount: 200, // Default amount - can be configured later
+                        description: `Appointment booking fee for ${appointmentDate} at ${appointmentStartTime}`,
+                        chargeType: 'appointment',
+                        status: 'pending',
+                        createdBy: req.user ? req.user.id : null,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    },
+                    {
+                        patientId: patientObjectId,
+                        appointmentId: appointmentId,
+                        chargeName: 'Doctor Consultation Fee',
+                        amount: 300, // Default amount - can be configured later
+                        description: `Doctor consultation charge for appointment`,
+                        chargeType: 'doctor',
+                        status: 'pending',
+                        createdBy: req.user ? req.user.id : null,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                ];
+
+                await dbInstance.collection('charges').insertMany(appointmentCharges);
+                console.log('✅ Appointment charges added automatically for appointment:', appointmentId.toString());
+            } catch (chargeError) {
+                // Log error but don't fail the appointment creation
+                console.error('⚠️ Failed to create appointment charges:', chargeError);
+            }
 
             res.status(201).json({
                 message: 'Appointment created successfully',
